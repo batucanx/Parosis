@@ -200,3 +200,9 @@ export const X = (p) => (
     <path d="m6 6 12 12M18 6 6 18" />
   </Svg>
 )
+
+export const ChevronDown = (p) => (
+  <Svg {...p}>
+    <path d="m6 9 6 6 6-6" />
+  </Svg>
+)
