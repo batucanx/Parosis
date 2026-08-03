@@ -11,10 +11,10 @@ export const wells = [
     il: 'Denizli',
     ilce: 'Pamukkale',
     badges: [
-      { label: 'Pompa', tone: 'green' },
-      { label: 'Termik', tone: 'green' },
-      { label: 'Enerji', tone: 'blue' },
-      { label: 'Haberleşme', tone: 'blue' },
+      { label: 'Pompa',       tone: 'green' },
+      { label: 'Termik',      tone: 'green' },
+      { label: 'Enerji',      tone: 'green' },
+      { label: 'Haberleşme',  tone: 'green' },
     ],
   },
   {
@@ -23,10 +23,10 @@ export const wells = [
     il: 'Denizli',
     ilce: 'Sarayköy',
     badges: [
-      { label: 'Pompa', tone: 'gray' },
-      { label: 'Termik', tone: 'green' },
-      { label: 'Enerji', tone: 'blue' },
-      { label: 'Haberleşme', tone: 'blue' },
+      { label: 'Pompa',       tone: 'gray' },
+      { label: 'Termik',      tone: 'green' },
+      { label: 'Enerji',      tone: 'green' },
+      { label: 'Haberleşme',  tone: 'green' },
     ],
   },
   {
@@ -35,10 +35,10 @@ export const wells = [
     il: 'Denizli',
     ilce: 'Çivril',
     badges: [
-      { label: 'Pompa', tone: 'green' },
-      { label: 'Termik', tone: 'gray' },
-      { label: 'Enerji', tone: 'blue' },
-      { label: 'Haberleşme', tone: 'gray' },
+      { label: 'Pompa',       tone: 'green' },
+      { label: 'Termik',      tone: 'gray' },
+      { label: 'Enerji',      tone: 'green' },
+      { label: 'Haberleşme',  tone: 'gray' },
     ],
   },
   {
@@ -47,10 +47,10 @@ export const wells = [
     il: 'Aydın',
     ilce: 'Söke',
     badges: [
-      { label: 'Pompa', tone: 'green' },
-      { label: 'Termik', tone: 'green' },
-      { label: 'Enerji', tone: 'blue' },
-      { label: 'Haberleşme', tone: 'blue' },
+      { label: 'Pompa',       tone: 'green' },
+      { label: 'Termik',      tone: 'green' },
+      { label: 'Enerji',      tone: 'green' },
+      { label: 'Haberleşme',  tone: 'green' },
     ],
   },
   {
@@ -59,10 +59,10 @@ export const wells = [
     il: 'Denizli',
     ilce: 'Honaz',
     badges: [
-      { label: 'Pompa', tone: 'gray' },
-      { label: 'Termik', tone: 'gray' },
-      { label: 'Enerji', tone: 'gray' },
-      { label: 'Haberleşme', tone: 'gray' },
+      { label: 'Pompa',       tone: 'gray' },
+      { label: 'Termik',      tone: 'gray' },
+      { label: 'Enerji',      tone: 'gray' },
+      { label: 'Haberleşme',  tone: 'gray' },
     ],
   },
 ]
@@ -89,6 +89,6 @@ export const statement = [
   { id: 'e6', tarih: '24 Tem', aciklama: 'Sulama · Ova 1', yukleme: null, harcama: 65 },
 ]
 
-export const quickAmounts = [50, 100, 150, 200]
+export const quickAmounts = [50, 100, 150, 200, 300, 500]
 
 export const formatTL = (n) => n.toLocaleString('tr-TR')

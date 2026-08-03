@@ -23,8 +23,8 @@ export default function TopUpScreen({ onBack, onConfirm }) {
 
       {/* --- Hızlı seçimler --- */}
       <section>
-        <h2 className="px-1 text-[16px] font-extrabold tracking-tight text-ink">Hızlı Seçim</h2>
-        <div className="mt-3.5 grid grid-cols-2 gap-3">
+        <h2 className="px-1 text-[14px] font-extrabold tracking-tight text-ink">Hızlı Seçim</h2>
+        <div className="mt-3 grid grid-cols-3 gap-2.5">
           {quickAmounts.map((v) => {
             const selected = numeric === v
             return (
@@ -34,9 +34,9 @@ export default function TopUpScreen({ onBack, onConfirm }) {
                 onClick={() => setAmount(String(v))}
                 aria-pressed={selected}
                 className={[
-                  'flex h-[76px] items-center justify-center rounded-[1.4rem] text-[19px] font-extrabold tracking-tight transition-all duration-200 active:scale-[0.97]',
+                  'flex h-[48px] items-center justify-center rounded-[1rem] text-[14px] font-extrabold tracking-tight transition-all duration-200 active:scale-[0.97]',
                   selected
-                    ? 'bg-brand-600 text-white shadow-[0_14px_28px_-14px_rgba(17,90,75,0.95),0_1px_0_0_rgba(255,255,255,0.3)_inset]'
+                    ? 'bg-brand-600 text-white shadow-[0_10px_20px_-10px_rgba(17,90,75,0.9),0_1px_0_0_rgba(255,255,255,0.3)_inset]'
                     : 'glass text-ink',
                 ].join(' ')}
               >
@@ -51,11 +51,11 @@ export default function TopUpScreen({ onBack, onConfirm }) {
       <section>
         <label
           htmlFor="tutar"
-          className="block px-1 text-[16px] font-extrabold tracking-tight text-ink"
+          className="block px-1 text-[14px] font-extrabold tracking-tight text-ink"
         >
           Kendi Tutarınız
         </label>
-        <div className="glass mt-3.5 flex h-[76px] items-center gap-3 rounded-[1.4rem] px-5">
+        <div className="glass mt-3 flex h-[52px] items-center gap-3 rounded-[1rem] px-4">
           <input
             id="tutar"
             type="text"
@@ -64,13 +64,22 @@ export default function TopUpScreen({ onBack, onConfirm }) {
             value={amount}
             onChange={handleInput}
             placeholder="Tutar giriniz"
-            className="w-full bg-transparent text-[19px] font-extrabold tracking-tight text-ink outline-none placeholder:text-[16px] placeholder:font-semibold placeholder:text-ink-faint"
+            className="w-full bg-transparent text-[16px] font-extrabold tracking-tight text-ink outline-none placeholder:text-[14px] placeholder:font-semibold placeholder:text-ink-faint"
           />
-          <span className="shrink-0 text-[18px] font-bold text-ink-soft">TL</span>
+          <span className="shrink-0 text-[14px] font-bold text-ink-soft">TL</span>
         </div>
-        <p className="mt-2.5 px-1 text-[13px] font-medium text-ink-faint">
-          Yukarıdan seçim yaptığınızda bu alan otomatik dolar.
-        </p>
+        <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-amber-200/70 bg-amber-50/60 px-3.5 py-2.5">
+          <span className="mt-0.5 shrink-0 text-amber-400">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </span>
+          <p className="text-[12px] font-semibold leading-snug text-amber-800/75">
+            Bakiye işlemlerini yukarıdan hızlı seçimden seçerek yapabilirsiniz. Test sürecinde olduğu için bakiyeniz direkt olarak yüklenir.
+          </p>
+        </div>
       </section>
 
       {/* --- Onay --- */}
@@ -79,14 +88,14 @@ export default function TopUpScreen({ onBack, onConfirm }) {
         disabled={!isValid}
         onClick={() => onConfirm(numeric)}
         className={[
-          'mt-1 flex h-[76px] w-full items-center justify-center gap-3 rounded-[1.5rem] text-[18px] font-extrabold tracking-tight transition-all duration-200',
+          'mt-1 flex h-[52px] w-full items-center justify-center gap-2.5 rounded-[1.1rem] text-[15px] font-extrabold tracking-tight transition-all duration-200',
           isValid
-            ? 'bg-brand-600 text-white shadow-[0_18px_34px_-16px_rgba(17,90,75,0.95),0_1px_0_0_rgba(255,255,255,0.3)_inset] active:scale-[0.98]'
+            ? 'bg-[#111111] text-white shadow-[0_12px_28px_-14px_rgba(0,0,0,0.6)] active:scale-[0.98]'
             : 'cursor-not-allowed bg-mist-200/70 text-mist-600',
         ].join(' ')}
       >
-        <Plus className="h-6 w-6" />
-        {isValid ? `${formatTL(numeric)} TL Yükle` : 'Tutar Seçin'}
+        <Plus className="h-5 w-5" />
+        {isValid ? 'Yükle' : 'Tutar Seçin'}
       </button>
     </div>
   )

@@ -51,13 +51,9 @@ body {
   color: var(--color-ink);
 }
 
-/* --- Uygulama arka planı: uçuk su yeşili + soluk mavi soft gradient --- */
+/* --- Uygulama arka planı: beyaz --- */
 .app-bg {
-  background:
-    radial-gradient(115% 75% at 12% -5%, #f6fdfa 0%, rgba(246, 253, 250, 0) 58%),
-    radial-gradient(95% 60% at 105% 12%, #e0f1fb 0%, rgba(224, 241, 251, 0) 55%),
-    radial-gradient(85% 55% at 50% 108%, #b7e2da 0%, rgba(183, 226, 218, 0) 60%),
-    linear-gradient(168deg, #eaf8f3 0%, #dcf0ec 42%, #c9e7e2 100%);
+  background: #ffffff;
 }
 
 /* --- Katmanlı buz (layered frost) panelleri --- */
@@ -147,4 +143,17 @@ body {
   .screen-in {
     animation: none;
   }
+}
+
+/* Uzun metin kayan animasyon */
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  30%  { transform: translateX(0); }
+  70%  { transform: translateX(-60%); }
+  100% { transform: translateX(0); }
+}
+.marquee-text {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee 5s ease-in-out infinite;
 }

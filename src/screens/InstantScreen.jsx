@@ -2,8 +2,7 @@ import { useState } from 'react'
 import PageHeading from '../components/PageHeading.jsx'
 import WellList from '../components/WellList.jsx'
 
-export default function InstantScreen({ onBack }) {
-  // Prototip: hangi kuyunun sulaması başlatıldı
+export default function InstantScreen({ onBack, onWellEdit, onNavigate }) {
   const [startedId, setStartedId] = useState(null)
 
   return (
@@ -13,7 +12,12 @@ export default function InstantScreen({ onBack }) {
         subtitle="Hemen başlatmak için kuyu seçin"
         onBack={onBack}
       />
-      <WellList startedId={startedId} onStart={(well) => setStartedId(well.id)} />
+      <WellList
+        startedId={startedId}
+        onStart={(well) => setStartedId(well.id)}
+        onWellEdit={onWellEdit}
+        onNavigate={onNavigate}
+      />
     </div>
   )
 }

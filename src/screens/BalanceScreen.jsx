@@ -32,9 +32,9 @@ export default function BalanceScreen({ balance, onTopUp, lastTopUp }) {
       <button
         type="button"
         onClick={onTopUp}
-        className="flex h-[74px] w-full items-center justify-center gap-3 rounded-[1.5rem] bg-brand-600 text-[18px] font-extrabold tracking-tight text-white shadow-[0_18px_34px_-16px_rgba(17,90,75,0.95),0_1px_0_0_rgba(255,255,255,0.3)_inset] transition-transform duration-200 active:scale-[0.98]"
+        className="flex h-[52px] w-full items-center justify-center gap-2.5 rounded-[1.1rem] bg-brand-600 text-[15px] font-extrabold tracking-tight text-white shadow-[0_12px_24px_-12px_rgba(17,90,75,0.9),0_1px_0_0_rgba(255,255,255,0.3)_inset] transition-transform duration-200 active:scale-[0.98]"
       >
-        <Plus className="h-6 w-6" />
+        <Plus className="h-5 w-5" />
         Bakiye Yükle
       </button>
 
