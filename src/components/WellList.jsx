@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Search, MapPin, Play, Gauge, Thermometer, Bolt, Signal, Droplet } from './Icons.jsx'
+import { Search, MapPin, Play, Droplet, ChevronRight } from './Icons.jsx'
 import { wells } from '../data.js'
 
 /* Aktif = yeşil, Deaktif = kırmızı */
@@ -10,13 +10,6 @@ const toneClass = {
 const toneDot = {
   green: 'bg-brand-500',
   gray:  'bg-red-500',
-}
-
-const badgeIcon = {
-  Pompa:      Gauge,
-  Termik:     Thermometer,
-  Enerji:     Bolt,
-  Haberleşme: Signal,
 }
 
 export default function WellList({ onStart, startedId, onWellEdit, onNavigate }) {
@@ -70,6 +63,8 @@ export default function WellList({ onStart, startedId, onWellEdit, onNavigate })
 }
 
 function WellCard({ well, onStart, started, onEdit, onNavigate }) {
+  const isInstant = !!onStart
+
   return (
     <article className="glass overflow-hidden rounded-[1.2rem]">
       {/* Kart gövdesi */}
@@ -116,7 +111,7 @@ function WellCard({ well, onStart, started, onEdit, onNavigate }) {
                 }
               }}
               className={[
-                'flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12px] font-bold text-white transition-all duration-200 active:scale-[0.96]',
+                'flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-3 text-[12px] font-bold text-white transition-all duration-200 active:scale-[0.96]',
                 started
                   ? 'bg-sea-600 shadow-[0_6px_14px_-6px_rgba(33,100,142,0.9)]'
                   : 'bg-brand-600 shadow-[0_6px_14px_-6px_rgba(17,90,75,0.9)]',
@@ -140,28 +135,27 @@ function WellCard({ well, onStart, started, onEdit, onNavigate }) {
             </button>
           )}
 
-          {/* Düzenleme ikonu (onEdit var ama onStart yok) */}
+          {/* Düzenleme göstergesi (onEdit var ama onStart yok) */}
           {!onStart && onEdit && (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-ink-faint" aria-hidden="true">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5Z" />
-            </svg>
+            <ChevronRight className="h-4 w-4 shrink-0 text-ink-faint" strokeWidth={2.2} />
           )}
         </div>
 
-        {/* Badge'ler — yatay kaydırmalı */}
-        <ul className="no-scrollbar mt-2.5 flex gap-1 overflow-x-auto">
+        {/* Badge'ler — Program Sulama'da kullanıcı kaydırarak görür, Anlık Sulama'da sabit */}
+        <ul
+          className={`mt-3 flex gap-1.5 ${
+            isInstant ? 'overflow-hidden' : 'no-scrollbar overflow-x-auto'
+          }`}
+        >
           {well.badges.map((b) => {
-            const Icon = badgeIcon[b.label]
             const tone = b.tone === 'blue' ? 'green' : b.tone
             return (
               <li
                 key={b.label}
-                className={`flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 ${toneClass[tone]}`}
+                className={`flex shrink-0 items-center gap-1.5 rounded-lg border px-2 py-1 shadow-sm ${toneClass[tone]}`}
               >
-                <span className={`h-1 w-1 rounded-full ${toneDot[tone]}`} />
-                {Icon && <Icon className="h-[10px] w-[10px]" strokeWidth={2.2} />}
-                <span className="text-[9.5px] font-bold uppercase tracking-tight">{b.label}</span>
+                <span className={`h-1.5 w-1.5 rounded-full ${toneDot[tone]}`} />
+                <span className="text-[10.5px] font-bold uppercase tracking-tight">{b.label}</span>
               </li>
             )
           })}

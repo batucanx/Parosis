@@ -13,10 +13,10 @@ const tabs = [
   { id: 'upcoming', label: 'Gelecek Sulamalar',  count: null },
 ]
 
-/* Badge rengi: green → brand-green, gray → red */
+/* Badge rengi: green → beyaz zemin yeşil metin, gray → beyaz zemin kırmızı metin */
 const badgeClass = {
-  green: 'bg-brand-100/90 text-brand-700 border-brand-200',
-  gray:  'bg-red-100/90   text-red-600   border-red-200',
+  green: 'bg-white text-brand-700 border-brand-200/60',
+  gray:  'bg-white text-red-600   border-red-200/60',
 }
 const badgeDot = {
   green: 'bg-brand-500',
@@ -150,16 +150,16 @@ function ActiveIrrigationCard() {
       {/* Durum + kullanım */}
       <div className="mt-3.5 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-green-300" />
-          <span className="text-[12px] font-semibold text-white/85">Sulama çalışıyor</span>
+          <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
+          <span className="text-[12px] font-semibold text-white">Sulama çalışıyor</span>
         </div>
-        <span className="text-[11px] font-semibold text-white/60">Kullanım 02:34:11</span>
+        <span className="text-[11px] font-semibold text-white">Kullanım 02:34:11</span>
       </div>
 
       {/* Durdur butonu */}
       <button
         type="button"
-        className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-2xl bg-white/15 text-[13px] font-bold text-white backdrop-blur-sm transition-colors active:bg-red-500/60"
+        className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-2xl bg-white text-[13px] font-bold text-brand-700 shadow-sm transition-colors active:bg-red-50 active:text-red-600"
       >
         {/* Pause icon */}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

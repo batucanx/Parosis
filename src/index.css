@@ -140,7 +140,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .screen-in {
+  .screen-in,
+  .marquee-text {
     animation: none;
   }
 }
@@ -156,4 +157,19 @@ body {
   display: inline-block;
   white-space: nowrap;
   animation: marquee 5s ease-in-out infinite;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes drawerDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
 }

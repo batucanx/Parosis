@@ -31,7 +31,7 @@ export const wells = [
   },
   {
     id: 'k3',
-    ad: 'Yayla Kuyu',
+    ad: 'Yayla Yaylası Ana Sulama Kuyusu ABCABCAB',
     il: 'Denizli',
     ilce: 'Çivril',
     badges: [
@@ -79,14 +79,29 @@ export const upcomingIrrigations = [
   { id: 'p3', kuyu: 'Yayla Kuyu', ilce: 'Çivril', tarih: '6 Ağustos', saat: '05:30', sure: '90 dk' },
 ]
 
-/** Hesap ekstresi — yukleme / harcama alanlarından yalnızca biri dolu olur. */
+/**
+ * Hesap ekstresi — year + month bazlı filtreleme için tam tarih eklenmiştir.
+ * year: sayı, month: 1-12
+ */
 export const statement = [
-  { id: 'e1', tarih: '2 Ağu', aciklama: 'Bakiye yükleme', yukleme: 150, harcama: null },
-  { id: 'e2', tarih: '1 Ağu', aciklama: 'Sulama · Yayla', yukleme: null, harcama: 85 },
-  { id: 'e3', tarih: '31 Tem', aciklama: 'Sulama · Ova 2', yukleme: null, harcama: 60 },
-  { id: 'e4', tarih: '29 Tem', aciklama: 'Sulama · Ova 1', yukleme: null, harcama: 120 },
-  { id: 'e5', tarih: '27 Tem', aciklama: 'Bakiye yükleme', yukleme: 200, harcama: null },
-  { id: 'e6', tarih: '24 Tem', aciklama: 'Sulama · Ova 1', yukleme: null, harcama: 65 },
+  { id: 'e1',  year: 2026, month: 8,  tarih: '2 Ağu',  aciklama: 'Bakiye yükleme',    yukleme: 150,  harcama: null },
+  { id: 'e2',  year: 2026, month: 8,  tarih: '1 Ağu',  aciklama: 'Sulama · Yayla',    yukleme: null, harcama: 85  },
+  { id: 'e3',  year: 2026, month: 7,  tarih: '31 Tem', aciklama: 'Sulama · Ova 2',    yukleme: null, harcama: 60  },
+  { id: 'e4',  year: 2026, month: 7,  tarih: '29 Tem', aciklama: 'Sulama · Ova 1',    yukleme: null, harcama: 120 },
+  { id: 'e5',  year: 2026, month: 7,  tarih: '27 Tem', aciklama: 'Bakiye yükleme',    yukleme: 200,  harcama: null },
+  { id: 'e6',  year: 2026, month: 7,  tarih: '24 Tem', aciklama: 'Sulama · Ova 1',    yukleme: null, harcama: 65  },
+  { id: 'e7',  year: 2026, month: 6,  tarih: '28 Haz', aciklama: 'Bakiye yükleme',    yukleme: 300,  harcama: null },
+  { id: 'e8',  year: 2026, month: 6,  tarih: '20 Haz', aciklama: 'Sulama · Yayla',    yukleme: null, harcama: 95  },
+  { id: 'e9',  year: 2026, month: 5,  tarih: '15 May', aciklama: 'Sulama · Ova 1',    yukleme: null, harcama: 70  },
+  { id: 'e10', year: 2026, month: 5,  tarih: '3 May',  aciklama: 'Bakiye yükleme',    yukleme: 500,  harcama: null },
+  { id: 'e11', year: 2026, month: 4,  tarih: '22 Nis', aciklama: 'Sulama · Menderes', yukleme: null, harcama: 110 },
+  { id: 'e12', year: 2026, month: 4,  tarih: '8 Nis',  aciklama: 'Bakiye yükleme',    yukleme: 250,  harcama: null },
+  { id: 'e13', year: 2026, month: 3,  tarih: '25 Mar', aciklama: 'Sulama · Bağ',      yukleme: null, harcama: 45  },
+  { id: 'e14', year: 2026, month: 3,  tarih: '18 Mar', aciklama: 'Sulama · Ova 2',    yukleme: null, harcama: 80  },
+  { id: 'e15', year: 2026, month: 3,  tarih: '10 Mar', aciklama: 'Bakiye yükleme',    yukleme: 400,  harcama: null },
+  { id: 'e16', year: 2026, month: 3,  tarih: '2 Mar',  aciklama: 'Sulama · Ova 1',    yukleme: null, harcama: 130 },
+  { id: 'e17', year: 2026, month: 2,  tarih: '14 Şub', aciklama: 'Bakiye yükleme',    yukleme: 200,  harcama: null },
+  { id: 'e18', year: 2026, month: 1,  tarih: '5 Oca',  aciklama: 'Sulama · Yayla',    yukleme: null, harcama: 55  },
 ]
 
 export const quickAmounts = [50, 100, 150, 200, 300, 500]

@@ -206,3 +206,32 @@ export const ChevronDown = (p) => (
     <path d="m6 9 6 6 6-6" />
   </Svg>
 )
+
+export const Menu = (p) => (
+  <Svg strokeWidth={2} {...p}>
+    <path d="M4 6h16M4 12h16M4 18h16" />
+  </Svg>
+)
+
+export const ListChecks = (p) => (
+  <Svg {...p}>
+    <path d="M4 8h10M4 14h7" />
+    <path d="m13 12 2 2 4-4" />
+  </Svg>
+)
+
+export const Tractor = (p) => (
+  <Svg {...p}>
+    <path d="M3 8v8a5 5 0 0 0 10 0V8H3Z" />
+    <path d="M13 8V6a2 2 0 0 1 4 0v2" />
+    <circle cx="19" cy="17" r="2" />
+    <path d="M13 14h6" />
+  </Svg>
+)
+
+export const Droplets = (p) => (
+  <Svg {...p}>
+    <path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05Z" />
+    <path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97" />
+  </Svg>
+)
