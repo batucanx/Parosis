@@ -1,6 +1,6 @@
 # Parosis Sulama
 
-[![Flutter CI](https://github.com/batucanx/SulamaProject/actions/workflows/flutter.yml/badge.svg)](https://github.com/batucanx/SulamaProject/actions/workflows/flutter.yml)
+[![Flutter CI](https://github.com/batucanx/Parosis/actions/workflows/flutter.yml/badge.svg)](https://github.com/batucanx/Parosis/actions/workflows/flutter.yml)
 
 Parosis sulama sistemlerinin mobil yönetimi için geliştirilen Flutter uygulaması. Tek kod tabanı üzerinden Android ve iOS hedeflerini destekler.
 
@@ -25,8 +25,8 @@ Parosis sulama sistemlerinin mobil yönetimi için geliştirilen Flutter uygulam
 ## Kurulum
 
 ```bash
-git clone https://github.com/batucanx/SulamaProject.git
-cd SulamaProject
+git clone https://github.com/batucanx/Parosis.git
+cd Parosis
 flutter pub get
 flutter run
 ```
