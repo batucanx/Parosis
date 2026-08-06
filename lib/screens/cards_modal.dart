@@ -14,9 +14,10 @@ class SavedCard {
   final String id;
   String label;
   final String last4;
-  final String expiry;
+  String expiry;
   final String holderName;
   final String scheme; // visa | mastercard | troy | other
+  bool isPrimary;
 
   SavedCard({
     required this.id,
@@ -25,6 +26,7 @@ class SavedCard {
     required this.expiry,
     required this.holderName,
     required this.scheme,
+    this.isPrimary = false,
   });
 }
 
@@ -66,6 +68,39 @@ void _setFormatted(TextEditingController ctrl, String formatted) {
   );
 }
 
+/// Kart ağlarında geçerlilik süresi genelde birkaç yılı geçmez; bu sınır,
+/// yanlış yazılmış (ör. "12/55") yılları erkenden yakalamak için makul bir
+/// varsayılandır. Gerçek kart/BIN doğrulaması sağlayıcı API'sine
+/// bağlandığında bu istemci tarafı kontrolün yerini sunucu doğrulaması alır;
+/// o zamana kadar aynı UX'i (kart ağı + issuer'dan bağımsız, anında geri
+/// bildirim) korur.
+const int maxCardValidityYears = 20;
+
+/// Hem yeni kart ekleme hem de kayıtlı kart güncelleme ekranında kullanılan
+/// tek doğrulama noktası — ileride API'ye bağlanınca değiştirilecek yer de
+/// burası olur.
+String? validateCardExpiry(String? value) {
+  final v = value?.trim() ?? '';
+  final parts = v.split('/');
+  if (v.length != 5 || parts.length != 2) {
+    return 'Son kullanma tarihi gerekli.';
+  }
+  final month = int.tryParse(parts[0]);
+  final year = int.tryParse(parts[1]);
+  if (month == null || year == null || month < 1 || month > 12) {
+    return 'Geçersiz tarih.';
+  }
+  final fullYear = 2000 + year;
+  final now = DateTime.now();
+  if (fullYear < now.year || (fullYear == now.year && month < now.month)) {
+    return 'Kartın süresi dolmuş.';
+  }
+  if (fullYear > now.year + maxCardValidityYears) {
+    return 'Yıl çok ileride.';
+  }
+  return null;
+}
+
 /// Kayıtlı Kartlar — navbar'dan yukarı kayarak açılan tam ekran sheet.
 /// Yeni kart formu (canlı önizleme + kart tipi tespiti + kart adlandırma)
 /// ve kayıtlı kart listesi (adıyla birlikte, düzenle/sil).
@@ -86,6 +121,7 @@ class _CardsModalState extends State<CardsModal> {
       expiry: '08/27',
       holderName: 'BATUHAN CANARACI',
       scheme: 'visa',
+      isPrimary: true,
     ),
     SavedCard(
       id: 'c2',
@@ -99,6 +135,7 @@ class _CardsModalState extends State<CardsModal> {
 
   String? _successMessage;
   bool _cardStorageConsent = false;
+  bool _makePrimaryOnCreate = false;
   Timer? _successTimer;
 
   final _numberCtrl = TextEditingController();
@@ -127,9 +164,16 @@ class _CardsModalState extends State<CardsModal> {
   String get _rawNumber => _numberCtrl.text.replaceAll(' ', '');
   String get _scheme => _detectScheme(_rawNumber);
 
+  /// Varsayılan kart listenin en üstünde gösterilir; diğerleri eklenme
+  /// sırasını korur.
+  List<SavedCard> get _displayCards => [
+    ..._cards.where((c) => c.isPrimary),
+    ..._cards.where((c) => !c.isPrimary),
+  ];
+
   bool get _hasValidCardDetails =>
       _rawNumber.length >= 13 &&
-      _expiryCtrl.text.length == 5 &&
+      validateCardExpiry(_expiryCtrl.text) == null &&
       _cvvCtrl.text.length >= 3 &&
       _holderCtrl.text.trim().length >= 2;
 
@@ -156,6 +200,16 @@ class _CardsModalState extends State<CardsModal> {
     _holderCtrl.clear();
     _labelCtrl.clear();
     _cardStorageConsent = false;
+    _makePrimaryOnCreate = false;
+  }
+
+  /// Birincil kart tam olarak bir tane olur; bu, ödeme altyapısı gerçek
+  /// backend'e bağlandığında sunucu tarafında da korunması gereken bir
+  /// değişmezdir (invariant).
+  void _makePrimary(SavedCard card) {
+    for (final c in _cards) {
+      c.isPrimary = identical(c, card);
+    }
   }
 
   SavedCard? _createNewCard() {
@@ -169,6 +223,7 @@ class _CardsModalState extends State<CardsModal> {
       expiry: _expiryCtrl.text,
       holderName: _holderCtrl.text.trim().toUpperCase(),
       scheme: _scheme.isEmpty ? 'other' : _scheme,
+      isPrimary: _cards.isEmpty || _makePrimaryOnCreate,
     );
   }
 
@@ -210,6 +265,7 @@ class _CardsModalState extends State<CardsModal> {
 
     setState(() {
       _cards.add(card);
+      if (card.isPrimary) _makePrimary(card);
       _successMessage = 'Kart başarıyla kaydedildi.';
     });
     _scheduleSuccessReset();
@@ -223,10 +279,14 @@ class _CardsModalState extends State<CardsModal> {
 
     setState(() {
       if (result.deleted) {
+        final wasPrimary = card.isPrimary;
         _cards.remove(card);
+        if (wasPrimary && _cards.isNotEmpty) _makePrimary(_cards.first);
         _successMessage = 'Kart başarıyla silindi.';
       } else {
         card.label = result.label!;
+        card.expiry = result.expiry!;
+        if (result.setPrimary) _makePrimary(card);
         _successMessage = 'Kart başarıyla güncellendi.';
       }
     });
@@ -352,7 +412,7 @@ class _CardsModalState extends State<CardsModal> {
           const Divider(color: Colors.black12, height: 1),
           const SizedBox(height: 14),
 
-          for (final card in _cards) ...[
+          for (final card in _displayCards) ...[
             _CardRow(card: card, onTap: () => _openEdit(card)),
             const SizedBox(height: 12),
           ],
@@ -617,7 +677,7 @@ class _CardsModalState extends State<CardsModal> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _FieldLabel('Son Kullanma'),
-                    TextField(
+                    TextFormField(
                       controller: _expiryCtrl,
                       focusNode: _expiryFocus,
                       keyboardType: TextInputType.number,
@@ -625,6 +685,8 @@ class _CardsModalState extends State<CardsModal> {
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(5),
                       ],
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: validateCardExpiry,
                       decoration: _fieldDecoration('AA/YY'),
                       onChanged: (v) {
                         final formatted = _formatExpiry(v);
@@ -673,6 +735,11 @@ class _CardsModalState extends State<CardsModal> {
             controller: _holderCtrl,
             focusNode: _holderFocus,
             textCapitalization: TextCapitalization.characters,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(
+                RegExp(r'[a-zA-ZçÇğĞıİöÖşŞüÜ\s]'),
+              ),
+            ],
             decoration: _fieldDecoration('AD SOYAD'),
             onChanged: (_) => pageSetState(() {}),
           ),
@@ -696,6 +763,86 @@ class _CardsModalState extends State<CardsModal> {
             controller: _labelCtrl,
             decoration: _fieldDecoration('ör. Yapı Kredi Banka Kartım'),
           ),
+          const SizedBox(height: 16),
+
+          if (_cards.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.brand100,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.brand200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.star_rounded,
+                    size: 18,
+                    color: AppColors.brand700,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'İlk kartınız otomatik olarak birincil kart olacak.',
+                      style: figtree(
+                        size: 11.8,
+                        weight: W.semibold,
+                        color: AppColors.brand800,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Semantics(
+              container: true,
+              checked: _makePrimaryOnCreate,
+              label: 'Bu kartı birincil kart olarak ayarla',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => pageSetState(
+                  () => _makePrimaryOnCreate = !_makePrimaryOnCreate,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Checkbox(
+                        value: _makePrimaryOnCreate,
+                        onChanged: (value) => pageSetState(
+                          () => _makePrimaryOnCreate = value ?? false,
+                        ),
+                        activeColor: AppColors.brand600,
+                        side: const BorderSide(
+                          color: AppColors.inkFaint,
+                          width: 1.5,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Bu kartı birincil kart yap.',
+                          style: figtree(
+                            size: 11.8,
+                            weight: W.semibold,
+                            color: AppColors.ink,
+                            height: 1.45,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           const SizedBox(height: 16),
 
           Container(
@@ -875,10 +1022,17 @@ class _CardsModalState extends State<CardsModal> {
 
 class _CardEditResult {
   final String? label;
+  final String? expiry;
+  final bool setPrimary;
   final bool deleted;
 
-  const _CardEditResult.updated(this.label) : deleted = false;
-  const _CardEditResult.deleted() : label = null, deleted = true;
+  const _CardEditResult.updated(this.label, this.expiry, this.setPrimary)
+    : deleted = false;
+  const _CardEditResult.deleted()
+    : label = null,
+      expiry = null,
+      setPrimary = false,
+      deleted = true;
 }
 
 class _SavedCardEditScreen extends StatefulWidget {
@@ -893,24 +1047,69 @@ class _SavedCardEditScreen extends StatefulWidget {
 class _SavedCardEditScreenState extends State<_SavedCardEditScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _labelController;
+  late final TextEditingController _expiryController;
+  final _cvvController = TextEditingController();
+  final _cvvFocus = FocusNode();
+  bool _setPrimary = false;
 
   @override
   void initState() {
     super.initState();
     _labelController = TextEditingController(text: widget.card.label);
+    _expiryController = TextEditingController(text: widget.card.expiry);
   }
 
   @override
   void dispose() {
     _labelController.dispose();
+    _expiryController.dispose();
+    _cvvController.dispose();
+    _cvvFocus.dispose();
     super.dispose();
+  }
+
+  String? _validateCvv(String? value) {
+    final v = value?.trim() ?? '';
+    if (v.length < 3) return 'Güvenlik kodu gerekli.';
+    return null;
+  }
+
+  Future<void> _showCvvHelp() {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Güvenlik kodu nedir?',
+          style: figtree(size: 17, weight: W.extrabold),
+        ),
+        content: Text(
+          'Kartınızın arkasındaki imza panelinde bulunan 3 haneli koddur (Visa, Mastercard) ya da Troy kartlarda kartın ön veya arka yüzünde yer alır.',
+          style: figtree(size: 14, weight: W.medium, color: AppColors.inkSoft, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(
+              'Anladım',
+              style: figtree(size: 14, weight: W.bold, color: AppColors.brand700),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _updateCard() {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    Navigator.of(
-      context,
-    ).pop(_CardEditResult.updated(_labelController.text.trim()));
+    Navigator.of(context).pop(
+      _CardEditResult.updated(
+        _labelController.text.trim(),
+        _expiryController.text.trim(),
+        _setPrimary,
+      ),
+    );
   }
 
   Future<void> _confirmDelete() async {
@@ -1001,7 +1200,7 @@ class _SavedCardEditScreenState extends State<_SavedCardEditScreen> {
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      'Kart Adını Düzenle',
+                      'Kartı Düzenle',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: figtree(
@@ -1027,18 +1226,169 @@ class _SavedCardEditScreenState extends State<_SavedCardEditScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const _FieldLabel('Kart Adı'),
+                          const _FieldLabel('Kart Numarası'),
+                          const SizedBox(height: 8),
+                          Semantics(
+                            readOnly: true,
+                            label:
+                                'Kart numarası. Son dört hanesi ${widget.card.last4}. Salt okunur.',
+                            excludeSemantics: true,
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 14,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceSoft,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: AppColors.surfaceBorder,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  _SchemeChip(scheme: widget.card.scheme),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      '•••• •••• •••• ${widget.card.last4}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: figtree(
+                                        size: 13.5,
+                                        weight: W.semibold,
+                                        color: AppColors.inkSoft,
+                                        tracking: Tracking.wide,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  AppIcons.lock(
+                                    size: 16,
+                                    color: AppColors.inkFaint,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const _FieldLabel('Son Kullanma'),
+                                    const SizedBox(height: 8),
+                                    TextFormField(
+                                      controller: _expiryController,
+                                      keyboardType: TextInputType.number,
+                                      textInputAction: TextInputAction.next,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                        LengthLimitingTextInputFormatter(5),
+                                      ],
+                                      autovalidateMode:
+                                          AutovalidateMode.onUserInteraction,
+                                      validator: validateCardExpiry,
+                                      onChanged: (v) {
+                                        final formatted = _formatExpiry(v);
+                                        _setFormatted(
+                                          _expiryController,
+                                          formatted,
+                                        );
+                                        if (formatted.length == 5) {
+                                          FocusScope.of(
+                                            context,
+                                          ).requestFocus(_cvvFocus);
+                                        }
+                                      },
+                                      style: figtree(
+                                        size: 14,
+                                        weight: W.bold,
+                                      ),
+                                      decoration: _fieldDecoration('AA/YY'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const _FieldLabel('Güvenlik Kodu'),
+                                        const SizedBox(width: 4),
+                                        Semantics(
+                                          button: true,
+                                          label:
+                                              'Güvenlik kodu nedir, bilgi al',
+                                          child: PressableScale(
+                                            scale: 0.85,
+                                            onTap: _showCvvHelp,
+                                            child: Icon(
+                                              Icons.help_outline_rounded,
+                                              size: 15,
+                                              color: AppColors.inkFaint,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    TextFormField(
+                                      controller: _cvvController,
+                                      focusNode: _cvvFocus,
+                                      obscureText: true,
+                                      keyboardType: TextInputType.number,
+                                      textInputAction: TextInputAction.done,
+                                      onFieldSubmitted: (_) => _updateCard(),
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                        LengthLimitingTextInputFormatter(4),
+                                      ],
+                                      autovalidateMode:
+                                          AutovalidateMode.onUserInteraction,
+                                      validator: _validateCvv,
+                                      style: figtree(
+                                        size: 14,
+                                        weight: W.bold,
+                                      ),
+                                      decoration: _fieldDecoration('•••'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 9),
+                          Text(
+                            'CVV/CVC kodunuz kaydedilmez; yalnızca kart bilgilerinizi doğrulamak için istenir.',
+                            style: figtree(
+                              size: 11.5,
+                              weight: W.medium,
+                              color: AppColors.inkFaint,
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Container(height: 1, color: AppColors.surfaceBorder),
+                          const SizedBox(height: 20),
+                          const _FieldLabel('Takma Ad'),
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _labelController,
-                            textInputAction: TextInputAction.done,
-                            onFieldSubmitted: (_) => _updateCard(),
+                            textInputAction: TextInputAction.next,
                             autovalidateMode:
                                 AutovalidateMode.onUserInteraction,
                             validator: (value) {
                               final label = value?.trim() ?? '';
                               if (label.isEmpty) {
-                                return 'Kart adı boş bırakılamaz.';
+                                return 'Takma ad boş bırakılamaz.';
                               }
                               if (label.length < 2) {
                                 return 'En az 2 karakter giriniz.';
@@ -1050,75 +1400,91 @@ class _SavedCardEditScreenState extends State<_SavedCardEditScreen> {
                               'ör. Garanti Banka Kartım',
                             ),
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 20),
                           Container(height: 1, color: AppColors.surfaceBorder),
                           const SizedBox(height: 20),
-                          const _FieldLabel('Kart Bilgileri'),
-                          const SizedBox(height: 8),
-                          Semantics(
-                            readOnly: true,
-                            label:
-                                'Kart bilgileri. Son dört hanesi ${widget.card.last4}, son kullanma tarihi ${widget.card.expiry}. Salt okunur.',
-                            excludeSemantics: true,
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(14),
+                          if (widget.card.isPrimary)
+                            Container(
+                              padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: AppColors.surfaceSoft,
+                                color: AppColors.brand100,
                                 borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: AppColors.surfaceBorder,
-                                ),
+                                border: Border.all(color: AppColors.brand200),
                               ),
                               child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.slate100,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Center(
-                                      child: AppIcons.creditCard(
-                                        size: 21,
-                                        color: AppColors.inkSoft,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      '•••• •••• •••• ${widget.card.last4}  ·  ${widget.card.expiry}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: figtree(
-                                        size: 13,
-                                        weight: W.semibold,
-                                        color: AppColors.inkSoft,
-                                        tracking: Tracking.wide,
-                                      ),
-                                    ),
+                                  Icon(
+                                    Icons.star_rounded,
+                                    size: 20,
+                                    color: AppColors.brand700,
                                   ),
                                   const SizedBox(width: 10),
-                                  AppIcons.lock(
-                                    size: 18,
-                                    color: AppColors.inkFaint,
+                                  Expanded(
+                                    child: Text(
+                                      'Bu, birincil kartınız. Ödeme geldiğinde bu karttan çekilir.',
+                                      style: figtree(
+                                        size: 12.5,
+                                        weight: W.semibold,
+                                        color: AppColors.brand800,
+                                        height: 1.4,
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
+                            )
+                          else
+                            Semantics(
+                              container: true,
+                              checked: _setPrimary,
+                              label: 'Bu kartı birincil kart olarak ayarla',
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(14),
+                                onTap: () =>
+                                    setState(() => _setPrimary = !_setPrimary),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 2,
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Checkbox(
+                                        value: _setPrimary,
+                                        onChanged: (value) => setState(
+                                          () => _setPrimary = value ?? false,
+                                        ),
+                                        activeColor: AppColors.brand600,
+                                        side: const BorderSide(
+                                          color: AppColors.inkFaint,
+                                          width: 1.5,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            5,
+                                          ),
+                                        ),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          'Bu kartı birincil kart olarak ayarla. Ödemeler bundan sonra bu karttan çekilir.',
+                                          style: figtree(
+                                            size: 12.5,
+                                            weight: W.semibold,
+                                            color: AppColors.ink,
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 9),
-                          Text(
-                            'Kart bilgilerini değiştirmek için bu kartı silip yeniden eklemeniz gerekir.',
-                            style: figtree(
-                              size: 11.5,
-                              weight: W.medium,
-                              color: AppColors.inkFaint,
-                              height: 1.4,
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -1135,7 +1501,7 @@ class _SavedCardEditScreenState extends State<_SavedCardEditScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Kart bilgileriniz maskelenerek gösterilir ve bu ekrandan değiştirilemez.',
+                          'Kart numaranız maskelenerek gösterilir ve bu ekrandan değiştirilemez; son kullanma tarihi, güvenlik kodu ve takma adı güncelleyebilirsiniz.',
                           style: figtree(
                             size: 13,
                             weight: W.medium,
@@ -1149,7 +1515,7 @@ class _SavedCardEditScreenState extends State<_SavedCardEditScreen> {
                   const SizedBox(height: 32),
                   Semantics(
                     button: true,
-                    label: 'Kart adını güncelle',
+                    label: 'Kartı güncelle',
                     child: PressableScale(
                       scale: 0.98,
                       onTap: _updateCard,
@@ -1169,7 +1535,7 @@ class _SavedCardEditScreenState extends State<_SavedCardEditScreen> {
                         ),
                         child: Center(
                           child: Text(
-                            'Kart Adını Güncelle',
+                            'Kartı Güncelle',
                             style: figtree(
                               size: 15,
                               weight: W.extrabold,
@@ -1416,7 +1782,12 @@ class _CardRow extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE5ECEB)),
+          border: Border.all(
+            color: card.isPrimary
+                ? AppColors.brand300
+                : const Color(0xFFE5ECEB),
+            width: card.isPrimary ? 1.4 : 1,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.06),
@@ -1434,15 +1805,52 @@ class _CardRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    card.label.isNotEmpty ? card.label : 'Kart',
-                    style: figtree(
-                      size: 13.5,
-                      weight: W.extrabold,
-                      color: AppColors.ink,
-                      tracking: Tracking.tight,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          card.label.isNotEmpty ? card.label : 'Kart',
+                          style: figtree(
+                            size: 13.5,
+                            weight: W.extrabold,
+                            color: AppColors.ink,
+                            tracking: Tracking.tight,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (card.isPrimary)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.brand100,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.star_rounded,
+                                size: 11,
+                                color: AppColors.brand700,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                'Varsayılan',
+                                style: figtree(
+                                  size: 10,
+                                  weight: W.extrabold,
+                                  color: AppColors.brand700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 3),
                   Row(

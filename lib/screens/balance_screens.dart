@@ -256,6 +256,8 @@ class _TopUpNotice extends StatelessWidget {
 }
 
 class _Filter<T> extends StatelessWidget {
+  static final Object _allSentinel = Object();
+
   final T? value;
   final String label;
   final List<T> items;
@@ -269,14 +271,15 @@ class _Filter<T> extends StatelessWidget {
     required this.onChanged,
   });
   @override
-  Widget build(BuildContext context) => PopupMenuButton<T?>(
-    onSelected: onChanged,
+  Widget build(BuildContext context) => PopupMenuButton<Object>(
+    onSelected: (selected) =>
+        onChanged(selected == _allSentinel ? null : selected as T),
     itemBuilder: (context) => [
-      PopupMenuItem<T?>(
-        value: null,
+      PopupMenuItem<Object>(
+        value: _allSentinel,
         child: Text(label.startsWith('Tüm') ? label : 'Tümü'),
       ),
-      ...items.map((v) => PopupMenuItem<T?>(value: v, child: Text(titleOf(v)))),
+      ...items.map((v) => PopupMenuItem<Object>(value: v as Object, child: Text(titleOf(v)))),
     ],
     child: Container(
       padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),

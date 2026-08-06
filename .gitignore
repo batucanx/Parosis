@@ -60,3 +60,6 @@ app.*.map.json
 # macOS / Xcode user data
 **/xcuserdata/
 **/DerivedData/
+
+.claude/
+web/
