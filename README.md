@@ -39,7 +39,19 @@ flutter devices
 
 ## iPhone'a kurulum
 
-iOS derlemesi ve fiziksel iPhone kurulumu macOS üzerinde Xcode gerektirir.
+iOS derlemesi ve fiziksel iPhone kurulumu macOS üzerinde Xcode gerektirir (Flutter 3.41 için güncel bir Xcode sürümü önerilir).
+
+### Ön koşullar (Mac'te bir kez yapılır)
+
+1. Xcode'u App Store'dan kurun, bir kez açıp lisans sözleşmesini onaylayın.
+2. CocoaPods'u kurun. Projede üçüncü parti native eklenti olmasa da Flutter'ın iOS derlemesi kendi motoru için CocoaPods'a ihtiyaç duyar:
+   ```bash
+   sudo gem install cocoapods
+   ```
+3. Xcode → Settings → Accounts bölümünden Apple ID'nizi ekleyin (takım seçimi için gereklidir).
+4. `flutter doctor` çalıştırıp iOS toolchain'inin eksiksiz olduğunu doğrulayın.
+
+### Kurulum adımları
 
 1. Repoyu Mac'e klonlayın ve `flutter pub get` çalıştırın.
 2. `ios/Runner.xcworkspace` dosyasını Xcode ile açın.
@@ -51,6 +63,10 @@ iOS derlemesi ve fiziksel iPhone kurulumu macOS üzerinde Xcode gerektirir.
 ```bash
 flutter run -d <cihaz-id>
 ```
+
+7. Uygulama telefona ilk kez yüklendiğinde açılmayabilir ("Untrusted Developer" hatası). Bunu çözmek için iPhone'da: **Ayarlar → Genel → VPN ve Cihaz Yönetimi**'nden geliştirici sertifikanıza dokunup **Güven**'i onaylayın.
+
+> **Not:** Ücretsiz (Personal Team) Apple ID ile imzalanan uygulamalar cihazda yalnızca **7 gün** geçerlidir; süre dolunca uygulamayı Xcode'dan yeniden yüklemeniz gerekir. Kalıcı kurulum için ücretli Apple Developer Program üyeliği gerekir.
 
 iOS release çıktısı:
 
