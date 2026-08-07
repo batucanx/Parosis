@@ -348,15 +348,3 @@ const monthLabels = <int, String>{
   11: 'Kasım',
   12: 'Aralık',
 };
-
-/// data.js `formatTL` — tr-TR biçimi (binlik ayraç nokta).
-String formatTL(num n) {
-  final isNegative = n < 0;
-  final intPart = n.abs().truncate().toString();
-  final buffer = StringBuffer();
-  for (var i = 0; i < intPart.length; i++) {
-    if (i > 0 && (intPart.length - i) % 3 == 0) buffer.write('.');
-    buffer.write(intPart[i]);
-  }
-  return '${isNegative ? '-' : ''}$buffer';
-}

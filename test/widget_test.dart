@@ -1,12 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:parosis_sulama/main.dart';
+import 'package:parosis_sulama/app/app.dart';
+import 'package:parosis_sulama/app/app_dependencies.dart';
+import 'package:parosis_sulama/app/app_root.dart';
 import 'package:parosis_sulama/widgets/marquee_text.dart';
 
 void main() {
+  const dependencies = AppDependencies();
+
+  testWidgets('Bağımlılıklar composition root üzerinden AppRoot’a aktarılır', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const SulamaApp(dependencies: dependencies));
+
+    final appRoot = tester.widget<AppRoot>(find.byType(AppRoot));
+    expect(appRoot.dependencies, same(dependencies));
+    expect(find.text('Ana Sayfa'), findsOneWidget);
+  });
+
   testWidgets('App açılır ve ana ekran görünür', (WidgetTester tester) async {
-    await tester.pumpWidget(const SulamaApp());
+    await tester.pumpWidget(const SulamaApp(dependencies: dependencies));
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.text('Ana Sayfa'), findsOneWidget);
@@ -18,7 +32,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(375, 812));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(const SulamaApp());
+    await tester.pumpWidget(const SulamaApp(dependencies: dependencies));
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.bySemanticsLabel('Hızlı erişim menüsünü aç'), findsOneWidget);
@@ -141,7 +155,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(375, 812));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(const SulamaApp());
+    await tester.pumpWidget(const SulamaApp(dependencies: dependencies));
     await tester.pump(const Duration(milliseconds: 400));
 
     await tester.tap(find.text('Profil'));
@@ -174,7 +188,7 @@ void main() {
   });
 
   testWidgets('Kart silme islemi onay ister', (WidgetTester tester) async {
-    await tester.pumpWidget(const SulamaApp());
+    await tester.pumpWidget(const SulamaApp(dependencies: dependencies));
     await tester.pump(const Duration(milliseconds: 400));
 
     await tester.tap(find.text('Profil'));

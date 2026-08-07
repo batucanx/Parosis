@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../data/mock_data.dart';
+
+import '../core/formatting/currency_formatter.dart';
 import '../icons/app_icons.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';

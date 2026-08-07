@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../core/formatting/currency_formatter.dart';
 import '../data/mock_data.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';

@@ -1,68 +1,68 @@
 import 'package:flutter/material.dart';
-import 'data/mock_data.dart';
-import 'widgets/app_header.dart';
-import 'widgets/bottom_nav.dart';
-import 'widgets/screen_in.dart';
-import 'screens/home_screen.dart';
-import 'screens/well_screens.dart';
-import 'screens/balance_screens.dart';
-import 'screens/profile_screen.dart';
-import 'screens/cards_modal.dart';
-import 'theme/colors.dart';
+
+import '../screens/balance_screens.dart';
+import '../screens/cards_modal.dart';
+import '../screens/home_screen.dart';
+import '../screens/profile_screen.dart';
+import '../screens/well_screens.dart';
+import '../theme/colors.dart';
+import '../widgets/app_header.dart';
+import '../widgets/bottom_nav.dart';
+import '../widgets/screen_in.dart';
+import 'app_dependencies.dart';
+import 'navigation/app_destination.dart';
 
 /// Web prototipindeki tek ekran state machine'inin Flutter karşılığı.
 class AppRoot extends StatefulWidget {
-  const AppRoot({super.key});
+  const AppRoot({super.key, required this.dependencies});
+
+  final AppDependencies dependencies;
+
   @override
   State<AppRoot> createState() => _AppRootState();
 }
 
 class _AppRootState extends State<AppRoot> {
-  String _screen = 'home';
+  AppDestination _screen = AppDestination.home;
   int _balance = 450;
   int? _lastTopUp;
   bool _showCardsModal = false;
-  Well? _selectedWell;
-  String _wellEditBackTarget = 'home';
-  String? _openSheet;
+  String? _selectedWellId;
+  AppDestination _wellEditBackTarget = AppDestination.home;
+  ProfileInfoSection? _openProfileInfoSection;
   bool _menuOpen = false;
 
-  static const _tabOfScreen = <String, String>{
-    'home': 'home',
-    'program': 'home',
-    'instant': 'home',
-    'balance': 'balance',
-    'topup': 'balance',
-    'profile': 'profile',
-  };
-
-  void _go(String next) => setState(() {
+  void _go(AppDestination next) => setState(() {
     _lastTopUp = null;
     _screen = next;
   });
-  void _openWellEdit(Well well) {
+
+  void _openWellEdit(String wellId) {
     setState(() {
-      _selectedWell = well;
+      _selectedWellId = wellId;
       _wellEditBackTarget = _screen;
     });
-    _go('welledit');
+    _go(AppDestination.wellEdit);
   }
 
   void _confirmTopUp(int amount) => setState(() {
     _balance += amount;
     _lastTopUp = amount;
-    _screen = 'balance';
+    _screen = AppDestination.balance;
   });
+
   void _openCards() => setState(() => _showCardsModal = true);
 
-  bool get _hasOverlay => _menuOpen || _showCardsModal || _openSheet != null;
-  bool get _isSubScreen =>
-      !const ['home', 'balance', 'profile'].contains(_screen);
-  String get _backTarget => switch (_screen) {
-    'program' || 'instant' => 'home',
-    'welledit' => _wellEditBackTarget,
-    'topup' => 'balance',
-    _ => _screen,
+  bool get _hasOverlay =>
+      _menuOpen || _showCardsModal || _openProfileInfoSection != null;
+  bool get _isSubScreen => !_screen.isPrimary;
+  AppDestination get _backTarget => switch (_screen) {
+    AppDestination.program || AppDestination.instant => AppDestination.home,
+    AppDestination.wellEdit => _wellEditBackTarget,
+    AppDestination.topUp => AppDestination.balance,
+    AppDestination.home ||
+    AppDestination.balance ||
+    AppDestination.profile => _screen,
   };
 
   void _handleBack() {
@@ -70,29 +70,37 @@ class _AppRootState extends State<AppRoot> {
       setState(() => _menuOpen = false);
     } else if (_showCardsModal) {
       setState(() => _showCardsModal = false);
-    } else if (_openSheet != null) {
-      setState(() => _openSheet = null);
+    } else if (_openProfileInfoSection != null) {
+      setState(() => _openProfileInfoSection = null);
     } else if (_isSubScreen) {
       _go(_backTarget);
     }
   }
 
   Widget _buildScreen() => switch (_screen) {
-    'home' => HomeScreen(onNavigate: _go),
-    'program' => ProgramScreen(onWellEdit: _openWellEdit),
-    'instant' => InstantScreen(onWellEdit: _openWellEdit, onNavigate: _go),
-    'balance' => BalanceScreen(
+    AppDestination.home => HomeScreen(
+      onProgramTap: () => _go(AppDestination.program),
+      onInstantTap: () => _go(AppDestination.instant),
+    ),
+    AppDestination.program => ProgramScreen(
+      onWellEdit: (well) => _openWellEdit(well.id),
+    ),
+    AppDestination.instant => InstantScreen(
+      onWellEdit: (well) => _openWellEdit(well.id),
+      onIrrigationStopped: () => _go(AppDestination.home),
+    ),
+    AppDestination.balance => BalanceScreen(
       balance: _balance,
       lastTopUp: _lastTopUp,
-      onTopUp: () => _go('topup'),
+      onTopUp: () => _go(AppDestination.topUp),
     ),
-    'topup' => TopUpScreen(onConfirm: _confirmTopUp),
-    'profile' => ProfileScreen(
+    AppDestination.topUp => TopUpScreen(onConfirm: _confirmTopUp),
+    AppDestination.profile => ProfileScreen(
       onOpenCards: _openCards,
-      onOpenSheet: (type) => setState(() => _openSheet = type),
+      onOpenSheet: (section) =>
+          setState(() => _openProfileInfoSection = section),
     ),
-    'welledit' => WellEditScreen(well: _selectedWell),
-    _ => const SizedBox.shrink(),
+    AppDestination.wellEdit => WellEditScreen(wellId: _selectedWellId),
   };
 
   @override
@@ -110,7 +118,7 @@ class _AppRootState extends State<AppRoot> {
               children: [
                 AppHeader(
                   balance: _balance,
-                  onBalanceTap: () => _go('balance'),
+                  onBalanceTap: () => _go(AppDestination.balance),
                   onMenuTap: () => setState(() => _menuOpen = true),
                   onBackTap: _handleBack,
                   showBackButton: _isSubScreen,
@@ -128,7 +136,7 @@ class _AppRootState extends State<AppRoot> {
               right: 12,
               bottom: 16,
               child: BottomNav(
-                activeTab: _tabOfScreen[_screen] ?? 'home',
+                activeDestination: _screen.primaryDestination,
                 onChange: _go,
               ),
             ),
@@ -175,10 +183,10 @@ class _AppRootState extends State<AppRoot> {
               CardsModal(
                 onClose: () => setState(() => _showCardsModal = false),
               ),
-            if (_openSheet != null)
+            if (_openProfileInfoSection case final section?)
               ProfileInfoSheet(
-                type: _openSheet!,
-                onClose: () => setState(() => _openSheet = null),
+                section: section,
+                onClose: () => setState(() => _openProfileInfoSection = null),
               ),
           ],
         ),

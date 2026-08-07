@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../core/formatting/currency_formatter.dart';
 import '../data/mock_data.dart';
 import '../icons/app_icons.dart';
 import '../theme/colors.dart';
@@ -279,7 +281,10 @@ class _Filter<T> extends StatelessWidget {
         value: _allSentinel,
         child: Text(label.startsWith('Tüm') ? label : 'Tümü'),
       ),
-      ...items.map((v) => PopupMenuItem<Object>(value: v as Object, child: Text(titleOf(v)))),
+      ...items.map(
+        (v) =>
+            PopupMenuItem<Object>(value: v as Object, child: Text(titleOf(v))),
+      ),
     ],
     child: Container(
       padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),

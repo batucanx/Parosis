@@ -5,9 +5,11 @@ import '../theme/text_styles.dart';
 import '../widgets/glass.dart';
 import '../widgets/overlay_sheet.dart';
 
+enum ProfileInfoSection { user, contact }
+
 class ProfileScreen extends StatelessWidget {
   final VoidCallback onOpenCards;
-  final ValueChanged<String> onOpenSheet;
+  final ValueChanged<ProfileInfoSection> onOpenSheet;
   const ProfileScreen({
     super.key,
     required this.onOpenCards,
@@ -76,13 +78,13 @@ class ProfileScreen extends StatelessWidget {
               icon: AppIcons.user(size: 20, color: AppColors.brand700),
               label: 'Kullanıcı Bilgileri',
               subtitle: 'Ad, e-posta, ID',
-              onTap: () => onOpenSheet('user'),
+              onTap: () => onOpenSheet(ProfileInfoSection.user),
             ),
             _row(
               icon: AppIcons.phone(size: 20, color: AppColors.brand700),
               label: 'İletişim Bilgileri',
               subtitle: 'Telefon, e-posta',
-              onTap: () => onOpenSheet('contact'),
+              onTap: () => onOpenSheet(ProfileInfoSection.contact),
             ),
             _row(
               icon: AppIcons.creditCard(size: 20, color: AppColors.brand700),
@@ -148,27 +150,31 @@ class ProfileScreen extends StatelessWidget {
 }
 
 class ProfileInfoSheet extends StatelessWidget {
-  final String type;
+  final ProfileInfoSection section;
   final VoidCallback onClose;
   const ProfileInfoSheet({
     super.key,
-    required this.type,
+    required this.section,
     required this.onClose,
   });
   @override
   Widget build(BuildContext context) {
-    final rows = type == 'user'
-        ? const [
-            'Ad Soyad|Batuhan Canaracı',
-            'E-posta|batuhancanaraci85@gmail.com',
-            'Kullanıcı ID|SLM-48210',
-          ]
-        : const [
-            'Telefon|0532 118 04 76',
-            'E-posta|batuhancanaraci85@gmail.com',
-          ];
+    final (title, rows) = switch (section) {
+      ProfileInfoSection.user => (
+        'Kullanıcı Bilgileri',
+        const [
+          'Ad Soyad|Batuhan Canaracı',
+          'E-posta|batuhancanaraci85@gmail.com',
+          'Kullanıcı ID|SLM-48210',
+        ],
+      ),
+      ProfileInfoSection.contact => (
+        'İletişim Bilgileri',
+        const ['Telefon|0532 118 04 76', 'E-posta|batuhancanaraci85@gmail.com'],
+      ),
+    };
     return OverlaySheet(
-      title: type == 'user' ? 'Kullanıcı Bilgileri' : 'İletişim Bilgileri',
+      title: title,
       onClose: onClose,
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 20),

@@ -1,31 +1,33 @@
 import 'package:flutter/material.dart';
+
+import '../app/navigation/app_destination.dart';
 import '../icons/app_icons.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import 'glass.dart';
 
 class _TabDef {
-  final String id;
+  final AppDestination destination;
   final String label;
   final Widget Function({double size, Color color}) icon;
-  const _TabDef(this.id, this.label, this.icon);
+  const _TabDef(this.destination, this.label, this.icon);
 }
 
 final _tabs = [
   _TabDef(
-    'home',
+    AppDestination.home,
     'Ana Sayfa',
     ({size = 24.0, color = Colors.black}) =>
         AppIcons.home(size: size, color: color),
   ),
   _TabDef(
-    'balance',
+    AppDestination.balance,
     'Bakiyem',
     ({size = 24.0, color = Colors.black}) =>
         AppIcons.wallet(size: size, color: color),
   ),
   _TabDef(
-    'profile',
+    AppDestination.profile,
     'Profil',
     ({size = 24.0, color = Colors.black}) =>
         AppIcons.user(size: size, color: color),
@@ -34,9 +36,13 @@ final _tabs = [
 
 /// Yüzen alt navigasyon — ikon üstte, yazı altta, seçili sekme yeşil pill.
 class BottomNav extends StatelessWidget {
-  final String activeTab;
-  final ValueChanged<String> onChange;
-  const BottomNav({super.key, required this.activeTab, required this.onChange});
+  final AppDestination activeDestination;
+  final ValueChanged<AppDestination> onChange;
+  const BottomNav({
+    super.key,
+    required this.activeDestination,
+    required this.onChange,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -49,8 +55,8 @@ class BottomNav extends StatelessWidget {
             Expanded(
               child: _NavButton(
                 tab: tab,
-                selected: activeTab == tab.id,
-                onTap: () => onChange(tab.id),
+                selected: activeDestination == tab.destination,
+                onTap: () => onChange(tab.destination),
               ),
             ),
         ],

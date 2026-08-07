@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../data/mock_data.dart';
 import '../icons/app_icons.dart';
 import '../theme/colors.dart';
@@ -21,11 +22,11 @@ class ProgramScreen extends StatelessWidget {
 
 class InstantScreen extends StatefulWidget {
   final ValueChanged<Well> onWellEdit;
-  final ValueChanged<String> onNavigate;
+  final VoidCallback onIrrigationStopped;
   const InstantScreen({
     super.key,
     required this.onWellEdit,
-    required this.onNavigate,
+    required this.onIrrigationStopped,
   });
   @override
   State<InstantScreen> createState() => _InstantScreenState();
@@ -40,7 +41,7 @@ class _InstantScreenState extends State<InstantScreen> {
     onWellEdit: widget.onWellEdit,
     startedId: startedId,
     onStart: (w) => setState(() => startedId = w.id),
-    onNavigate: widget.onNavigate,
+    onIrrigationStopped: widget.onIrrigationStopped,
   );
 }
 
@@ -49,14 +50,14 @@ class _WellPage extends StatelessWidget {
   final ValueChanged<Well> onWellEdit;
   final String? startedId;
   final ValueChanged<Well>? onStart;
-  final ValueChanged<String>? onNavigate;
+  final VoidCallback? onIrrigationStopped;
   const _WellPage({
     required this.title,
     required this.subtitle,
     required this.onWellEdit,
     this.startedId,
     this.onStart,
-    this.onNavigate,
+    this.onIrrigationStopped,
   });
   @override
   Widget build(BuildContext c) => ListView(
@@ -68,7 +69,7 @@ class _WellPage extends StatelessWidget {
         onWellEdit: onWellEdit,
         startedId: startedId,
         onStart: onStart,
-        onNavigate: onNavigate,
+        onIrrigationStopped: onIrrigationStopped,
       ),
     ],
   );
@@ -78,13 +79,13 @@ class WellList extends StatefulWidget {
   final ValueChanged<Well> onWellEdit;
   final String? startedId;
   final ValueChanged<Well>? onStart;
-  final ValueChanged<String>? onNavigate;
+  final VoidCallback? onIrrigationStopped;
   const WellList({
     super.key,
     required this.onWellEdit,
     this.startedId,
     this.onStart,
-    this.onNavigate,
+    this.onIrrigationStopped,
   });
   @override
   State<WellList> createState() => _WellListState();
@@ -168,7 +169,7 @@ class _WellListState extends State<WellList> {
                   ? null
                   : () {
                       if (widget.startedId == well.id) {
-                        widget.onNavigate?.call('home');
+                        widget.onIrrigationStopped?.call();
                       } else {
                         widget.onStart!(well);
                       }
@@ -364,38 +365,50 @@ class _WellBadge extends StatelessWidget {
 }
 
 class WellEditScreen extends StatelessWidget {
-  final Well? well;
-  const WellEditScreen({super.key, required this.well});
+  final String? wellId;
+  const WellEditScreen({super.key, required this.wellId});
+
+  Well? get _well => switch (wellId) {
+    final id? => wells.where((well) => well.id == id).firstOrNull,
+    null => null,
+  };
+
   @override
-  Widget build(BuildContext c) => ListView(
-    padding: const EdgeInsets.fromLTRB(20, 2, 20, 104),
-    children: [
-      PageHeading(
-        title: well?.ad ?? 'Kuyu Düzenle',
-        subtitle: 'Kuyu bilgilerini güncelleyin',
-      ),
-      const SizedBox(height: 20),
-      GlassPanel(
-        borderRadius: BorderRadius.circular(22),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 56),
-        child: Column(
-          children: [
-            Icon(Icons.edit_outlined, size: 40, color: AppColors.inkFaint),
-            const SizedBox(height: 12),
-            Text('Düzenleme Ekranı', style: figtree(size: 15, weight: W.bold)),
-            const SizedBox(height: 4),
-            Text(
-              'Bu bölüm yakında aktif olacak.',
-              textAlign: TextAlign.center,
-              style: figtree(
-                size: 13,
-                weight: W.medium,
-                color: AppColors.inkSoft,
-              ),
-            ),
-          ],
+  Widget build(BuildContext c) {
+    final well = _well;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 2, 20, 104),
+      children: [
+        PageHeading(
+          title: well?.ad ?? 'Kuyu Düzenle',
+          subtitle: 'Kuyu bilgilerini güncelleyin',
         ),
-      ),
-    ],
-  );
+        const SizedBox(height: 20),
+        GlassPanel(
+          borderRadius: BorderRadius.circular(22),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 56),
+          child: Column(
+            children: [
+              Icon(Icons.edit_outlined, size: 40, color: AppColors.inkFaint),
+              const SizedBox(height: 12),
+              Text(
+                'Düzenleme Ekranı',
+                style: figtree(size: 15, weight: W.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Bu bölüm yakında aktif olacak.',
+                textAlign: TextAlign.center,
+                style: figtree(
+                  size: 13,
+                  weight: W.medium,
+                  color: AppColors.inkSoft,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }

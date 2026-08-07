@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../data/mock_data.dart';
 import '../icons/app_icons.dart';
 import '../theme/colors.dart';
@@ -7,8 +8,13 @@ import '../widgets/glass.dart';
 import '../widgets/pressable_scale.dart';
 
 class HomeScreen extends StatefulWidget {
-  final ValueChanged<String> onNavigate;
-  const HomeScreen({super.key, required this.onNavigate});
+  final VoidCallback onProgramTap;
+  final VoidCallback onInstantTap;
+  const HomeScreen({
+    super.key,
+    required this.onProgramTap,
+    required this.onInstantTap,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -27,7 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: AppIcons.calendarClock(size: 24, color: Colors.white),
           title: 'Program Sulama',
           description: 'İleri tarihe sulama planla',
-          onTap: () => widget.onNavigate('program'),
+          onTap: widget.onProgramTap,
         ),
         const SizedBox(height: 12),
         _BigAction(
@@ -35,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: AppIcons.droplet(size: 24, color: Colors.white),
           title: 'Anlık Sulama',
           description: 'Kuyuyu hemen çalıştır',
-          onTap: () => widget.onNavigate('instant'),
+          onTap: widget.onInstantTap,
         ),
         const SizedBox(height: 20),
         Row(
