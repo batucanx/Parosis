@@ -8,13 +8,15 @@ class OverlaySheet extends StatelessWidget {
   final String title;
   final VoidCallback onClose;
   final Widget child;
+  final double heightFactor;
 
   const OverlaySheet({
     super.key,
     required this.title,
     required this.onClose,
     required this.child,
-  });
+    this.heightFactor = 0.88,
+  }) : assert(heightFactor > 0 && heightFactor <= 1);
 
   @override
   Widget build(BuildContext context) {
@@ -28,55 +30,69 @@ class OverlaySheet extends StatelessWidget {
           ),
           Align(
             alignment: Alignment.bottomCenter,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 1, end: 0),
-              duration: const Duration(milliseconds: 360),
-              curve: Curves.easeOutCubic,
-              builder: (context, value, sheet) => Transform.translate(
-                offset: Offset(0, value * MediaQuery.sizeOf(context).height),
-                child: sheet,
-              ),
-              child: Container(
-                height: MediaQuery.sizeOf(context).height - 54,
-                decoration: const BoxDecoration(
-                  color: AppColors.sheetBg,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(29)),
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(top: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.black12,
-                        borderRadius: BorderRadius.circular(5),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final sheetHeight = constraints.maxHeight * heightFactor;
+                return TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 1, end: 0),
+                  duration: const Duration(milliseconds: 360),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, sheet) => Transform.translate(
+                    offset: Offset(0, value * sheetHeight),
+                    child: sheet,
+                  ),
+                  child: SizedBox(
+                    key: const ValueKey('overlay-sheet-panel'),
+                    width: double.infinity,
+                    height: sheetHeight,
+                    child: DecoratedBox(
+                      decoration: const BoxDecoration(
+                        color: AppColors.sheetBg,
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(29),
+                        ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
-                      child: Row(
+                      child: Column(
                         children: [
-                          Expanded(
-                            child: Text(
-                              title,
-                              style: figtree(size: 17, weight: W.extrabold),
+                          Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.only(top: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.black12,
+                              borderRadius: BorderRadius.circular(5),
                             ),
                           ),
-                          IconButton(
-                            onPressed: onClose,
-                            icon: const Icon(
-                              Icons.close,
-                              color: AppColors.inkSoft,
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    title,
+                                    style: figtree(
+                                      size: 17,
+                                      weight: W.extrabold,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: onClose,
+                                  icon: const Icon(
+                                    Icons.close,
+                                    color: AppColors.inkSoft,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
+                          Expanded(child: child),
                         ],
                       ),
                     ),
-                    Expanded(child: child),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
           ),
         ],

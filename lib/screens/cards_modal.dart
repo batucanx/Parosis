@@ -230,33 +230,11 @@ class _CardsModalState extends State<CardsModal> {
   Future<void> _openNewCard() async {
     _resetForm();
     final card = await Navigator.of(context).push<SavedCard>(
-      PageRouteBuilder<SavedCard>(
-        transitionDuration: const Duration(milliseconds: 320),
-        reverseTransitionDuration: const Duration(milliseconds: 240),
-        pageBuilder: (routeContext, animation, secondaryAnimation) {
-          return StatefulBuilder(
-            builder: (pageContext, pageSetState) =>
-                _buildNewCardScreen(pageContext, pageSetState),
-          );
-        },
-        transitionsBuilder: (routeContext, animation, secondary, child) {
-          if (MediaQuery.disableAnimationsOf(routeContext)) return child;
-          final curved = CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-            reverseCurve: Curves.easeInCubic,
-          );
-          return FadeTransition(
-            opacity: curved,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 0.14),
-                end: Offset.zero,
-              ).animate(curved),
-              child: child,
-            ),
-          );
-        },
+      MaterialPageRoute<SavedCard>(
+        builder: (_) => StatefulBuilder(
+          builder: (pageContext, pageSetState) =>
+              _buildNewCardScreen(pageContext, pageSetState),
+        ),
       ),
     );
     if (!mounted) return;
@@ -670,63 +648,56 @@ class _CardsModalState extends State<CardsModal> {
           ),
           const SizedBox(height: 10),
 
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _FieldLabel('Son Kullanma'),
-                    TextFormField(
-                      controller: _expiryCtrl,
-                      focusNode: _expiryFocus,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(5),
-                      ],
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      validator: validateCardExpiry,
-                      decoration: _fieldDecoration('AA/YY'),
-                      onChanged: (v) {
-                        final formatted = _formatExpiry(v);
-                        _setFormatted(_expiryCtrl, formatted);
-                        if (formatted.length == 5) {
-                          FocusScope.of(pageContext).requestFocus(_cvvFocus);
-                        }
-                        pageSetState(() {});
-                      },
-                    ),
+          _ResponsiveFieldPair(
+            first: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _FieldLabel('Son Kullanma'),
+                TextFormField(
+                  controller: _expiryCtrl,
+                  focusNode: _expiryFocus,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(5),
                   ],
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  validator: validateCardExpiry,
+                  decoration: _fieldDecoration('AA/YY'),
+                  onChanged: (v) {
+                    final formatted = _formatExpiry(v);
+                    _setFormatted(_expiryCtrl, formatted);
+                    if (formatted.length == 5) {
+                      FocusScope.of(pageContext).requestFocus(_cvvFocus);
+                    }
+                    pageSetState(() {});
+                  },
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _FieldLabel('CVV / CVC'),
-                    TextField(
-                      controller: _cvvCtrl,
-                      focusNode: _cvvFocus,
-                      obscureText: true,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(4),
-                      ],
-                      decoration: _fieldDecoration('•••'),
-                      onChanged: (v) {
-                        if (v.length >= 3) {
-                          FocusScope.of(pageContext).requestFocus(_holderFocus);
-                        }
-                        pageSetState(() {});
-                      },
-                    ),
+              ],
+            ),
+            second: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _FieldLabel('CVV / CVC'),
+                TextField(
+                  controller: _cvvCtrl,
+                  focusNode: _cvvFocus,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(4),
                   ],
+                  decoration: _fieldDecoration('•••'),
+                  onChanged: (v) {
+                    if (v.length >= 3) {
+                      FocusScope.of(pageContext).requestFocus(_holderFocus);
+                    }
+                    pageSetState(() {});
+                  },
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 10),
 
@@ -776,11 +747,7 @@ class _CardsModalState extends State<CardsModal> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.star_rounded,
-                    size: 18,
-                    color: AppColors.brand700,
-                  ),
+                  Icon(Icons.star_rounded, size: 18, color: AppColors.brand700),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -1070,6 +1037,9 @@ class _SavedCardEditScreenState extends State<_SavedCardEditScreen> {
 
   String? _validateCvv(String? value) {
     final v = value?.trim() ?? '';
+    final expiryChanged =
+        _expiryController.text.trim() != widget.card.expiry.trim();
+    if (v.isEmpty && !expiryChanged) return null;
     if (v.length < 3) return 'Güvenlik kodu gerekli.';
     return null;
   }
@@ -1086,14 +1056,23 @@ class _SavedCardEditScreenState extends State<_SavedCardEditScreen> {
         ),
         content: Text(
           'Kartınızın arkasındaki imza panelinde bulunan 3 haneli koddur (Visa, Mastercard) ya da Troy kartlarda kartın ön veya arka yüzünde yer alır.',
-          style: figtree(size: 14, weight: W.medium, color: AppColors.inkSoft, height: 1.4),
+          style: figtree(
+            size: 14,
+            weight: W.medium,
+            color: AppColors.inkSoft,
+            height: 1.4,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
             child: Text(
               'Anladım',
-              style: figtree(size: 14, weight: W.bold, color: AppColors.brand700),
+              style: figtree(
+                size: 14,
+                weight: W.bold,
+                color: AppColors.brand700,
+              ),
             ),
           ),
         ],
@@ -1200,7 +1179,7 @@ class _SavedCardEditScreenState extends State<_SavedCardEditScreen> {
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      'Kartı Düzenle',
+                      'Kayıtlı Kartı Düzenle',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: figtree(
@@ -1216,6 +1195,8 @@ class _SavedCardEditScreenState extends State<_SavedCardEditScreen> {
             ),
             Expanded(
               child: ListView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
                 children: [
                   GlassPanel(
@@ -1273,101 +1254,81 @@ class _SavedCardEditScreenState extends State<_SavedCardEditScreen> {
                             ),
                           ),
                           const SizedBox(height: 14),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const _FieldLabel('Son Kullanma'),
-                                    const SizedBox(height: 8),
-                                    TextFormField(
-                                      controller: _expiryController,
-                                      keyboardType: TextInputType.number,
-                                      textInputAction: TextInputAction.next,
-                                      inputFormatters: [
-                                        FilteringTextInputFormatter.digitsOnly,
-                                        LengthLimitingTextInputFormatter(5),
-                                      ],
-                                      autovalidateMode:
-                                          AutovalidateMode.onUserInteraction,
-                                      validator: validateCardExpiry,
-                                      onChanged: (v) {
-                                        final formatted = _formatExpiry(v);
-                                        _setFormatted(
-                                          _expiryController,
-                                          formatted,
-                                        );
-                                        if (formatted.length == 5) {
-                                          FocusScope.of(
-                                            context,
-                                          ).requestFocus(_cvvFocus);
-                                        }
-                                      },
-                                      style: figtree(
-                                        size: 14,
-                                        weight: W.bold,
-                                      ),
-                                      decoration: _fieldDecoration('AA/YY'),
-                                    ),
+                          _ResponsiveFieldPair(
+                            first: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const _FieldLabel('Son Kullanma'),
+                                const SizedBox(height: 8),
+                                _ValidatedTextField(
+                                  controller: _expiryController,
+                                  keyboardType: TextInputType.number,
+                                  textInputAction: TextInputAction.next,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(5),
                                   ],
+                                  validator: validateCardExpiry,
+                                  onChanged: (v) {
+                                    final formatted = _formatExpiry(v);
+                                    _setFormatted(_expiryController, formatted);
+                                    if (formatted.length == 5) {
+                                      FocusScope.of(
+                                        context,
+                                      ).requestFocus(_cvvFocus);
+                                    }
+                                  },
+                                  style: figtree(size: 14, weight: W.bold),
+                                  decoration: _fieldDecoration('AA/YY'),
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                              ],
+                            ),
+                            second: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
                                   children: [
-                                    Row(
-                                      children: [
-                                        const _FieldLabel('Güvenlik Kodu'),
-                                        const SizedBox(width: 4),
-                                        Semantics(
-                                          button: true,
-                                          label:
-                                              'Güvenlik kodu nedir, bilgi al',
-                                          child: PressableScale(
-                                            scale: 0.85,
-                                            onTap: _showCvvHelp,
-                                            child: Icon(
-                                              Icons.help_outline_rounded,
-                                              size: 15,
-                                              color: AppColors.inkFaint,
-                                            ),
-                                          ),
+                                    const Flexible(
+                                      child: _FieldLabel('Güvenlik Kodu'),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Semantics(
+                                      button: true,
+                                      label: 'Güvenlik kodu nedir, bilgi al',
+                                      child: PressableScale(
+                                        scale: 0.85,
+                                        onTap: _showCvvHelp,
+                                        child: Icon(
+                                          Icons.help_outline_rounded,
+                                          size: 15,
+                                          color: AppColors.inkFaint,
                                         ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    TextFormField(
-                                      controller: _cvvController,
-                                      focusNode: _cvvFocus,
-                                      obscureText: true,
-                                      keyboardType: TextInputType.number,
-                                      textInputAction: TextInputAction.done,
-                                      onFieldSubmitted: (_) => _updateCard(),
-                                      inputFormatters: [
-                                        FilteringTextInputFormatter.digitsOnly,
-                                        LengthLimitingTextInputFormatter(4),
-                                      ],
-                                      autovalidateMode:
-                                          AutovalidateMode.onUserInteraction,
-                                      validator: _validateCvv,
-                                      style: figtree(
-                                        size: 14,
-                                        weight: W.bold,
                                       ),
-                                      decoration: _fieldDecoration('•••'),
                                     ),
                                   ],
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 8),
+                                _ValidatedTextField(
+                                  controller: _cvvController,
+                                  focusNode: _cvvFocus,
+                                  obscureText: true,
+                                  keyboardType: TextInputType.number,
+                                  textInputAction: TextInputAction.done,
+                                  onFieldSubmitted: (_) => _updateCard(),
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(4),
+                                  ],
+                                  validator: _validateCvv,
+                                  style: figtree(size: 14, weight: W.bold),
+                                  decoration: _fieldDecoration('•••'),
+                                ),
+                              ],
+                            ),
                           ),
                           const SizedBox(height: 9),
                           Text(
-                            'CVV/CVC kodunuz kaydedilmez; yalnızca kart bilgilerinizi doğrulamak için istenir.',
+                            'CVV/CVC kodunuz kaydedilmez; son kullanma tarihini değiştirirseniz kartı doğrulamak için istenir.',
                             style: figtree(
                               size: 11.5,
                               weight: W.medium,
@@ -1512,74 +1473,41 @@ class _SavedCardEditScreenState extends State<_SavedCardEditScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 32),
-                  Semantics(
-                    button: true,
-                    label: 'Kartı güncelle',
-                    child: PressableScale(
-                      scale: 0.98,
-                      onTap: _updateCard,
-                      child: Container(
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: AppColors.nearBlack,
-                          borderRadius: BorderRadius.circular(18),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.18),
-                              blurRadius: 18,
-                              spreadRadius: -8,
-                              offset: const Offset(0, 9),
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Kartı Güncelle',
-                            style: figtree(
-                              size: 15,
-                              weight: W.extrabold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Semantics(
-                    button: true,
-                    label: 'Kayıtlı kartı sil',
-                    child: PressableScale(
-                      scale: 0.98,
-                      onTap: _confirmDelete,
-                      child: Container(
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.82),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: AppColors.ink.withValues(alpha: 0.70),
-                            width: 1.2,
-                          ),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Kartı Sil',
-                            style: figtree(
-                              size: 15,
-                              weight: W.extrabold,
-                              color: AppColors.ink,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
           ],
+        ),
+      ),
+      bottomNavigationBar: DecoratedBox(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          border: Border(top: BorderSide(color: AppColors.surfaceBorder)),
+        ),
+        child: SafeArea(
+          top: false,
+          minimum: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: _EditActionButton(
+                  label: 'Kartı Sil',
+                  semanticLabel: 'Kayıtlı kartı sil',
+                  onTap: _confirmDelete,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _EditActionButton(
+                  label: 'Güncelle',
+                  semanticLabel: 'Kartı güncelle',
+                  onTap: _updateCard,
+                  isPrimary: true,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1622,6 +1550,141 @@ class _FieldLabel extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _ValidatedTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final FocusNode? focusNode;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final List<TextInputFormatter>? inputFormatters;
+  final FormFieldValidator<String>? validator;
+  final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onFieldSubmitted;
+  final TextStyle? style;
+  final InputDecoration decoration;
+  final bool obscureText;
+
+  const _ValidatedTextField({
+    required this.controller,
+    required this.decoration,
+    this.focusNode,
+    this.keyboardType,
+    this.textInputAction,
+    this.inputFormatters,
+    this.validator,
+    this.onChanged,
+    this.onFieldSubmitted,
+    this.style,
+    this.obscureText = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FormField<String>(
+      initialValue: controller.text,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      validator: validator,
+      builder: (field) => TextField(
+        controller: controller,
+        focusNode: focusNode,
+        keyboardType: keyboardType,
+        textInputAction: textInputAction,
+        inputFormatters: inputFormatters,
+        obscureText: obscureText,
+        style: style,
+        decoration: decoration.copyWith(errorText: field.errorText),
+        onChanged: (value) {
+          onChanged?.call(value);
+          field.didChange(controller.text);
+        },
+        onSubmitted: onFieldSubmitted,
+      ),
+    );
+  }
+}
+
+class _ResponsiveFieldPair extends StatelessWidget {
+  final Widget first;
+  final Widget second;
+
+  const _ResponsiveFieldPair({required this.first, required this.second});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final scaledLabelSize = MediaQuery.textScalerOf(context).scale(10.5);
+        final hasRoomForTwoColumns =
+            constraints.maxWidth >= 340 && scaledLabelSize <= 13;
+
+        if (!hasRoomForTwoColumns) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [first, const SizedBox(height: 14), second],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: first),
+            const SizedBox(width: 10),
+            Expanded(child: second),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _EditActionButton extends StatelessWidget {
+  final String label;
+  final String semanticLabel;
+  final VoidCallback onTap;
+  final bool isPrimary;
+
+  const _EditActionButton({
+    required this.label,
+    required this.semanticLabel,
+    required this.onTap,
+    this.isPrimary = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: PressableScale(
+        scale: 0.98,
+        onTap: onTap,
+        child: Container(
+          height: 52,
+          decoration: BoxDecoration(
+            color: isPrimary ? AppColors.nearBlack : AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: isPrimary
+                ? null
+                : Border.all(
+                    color: AppColors.ink.withValues(alpha: 0.7),
+                    width: 1.2,
+                  ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: figtree(
+                size: 14.5,
+                weight: W.extrabold,
+                color: isPrimary ? Colors.white : AppColors.ink,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _SchemeBadge extends StatelessWidget {
