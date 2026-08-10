@@ -1,0 +1,477 @@
+import 'package:flutter/material.dart';
+
+import 'package:parosis_sulama/features/irrigation/presentation/controllers/irrigation_controller.dart';
+import 'package:parosis_sulama/features/wells/domain/entities/well.dart';
+import 'package:parosis_sulama/features/wells/presentation/controllers/wells_controller.dart';
+import 'package:parosis_sulama/icons/app_icons.dart';
+import 'package:parosis_sulama/theme/colors.dart';
+import 'package:parosis_sulama/theme/text_styles.dart';
+import 'package:parosis_sulama/widgets/glass.dart';
+import 'package:parosis_sulama/widgets/marquee_text.dart';
+import 'package:parosis_sulama/widgets/page_heading.dart';
+import 'package:parosis_sulama/widgets/pressable_scale.dart';
+
+String _componentLabel(WellComponentType type) => switch (type) {
+  WellComponentType.pump => 'Pompa',
+  WellComponentType.thermal => 'Termik',
+  WellComponentType.power => 'Enerji',
+  WellComponentType.communication => 'Haberleşme',
+};
+
+class ProgramScreen extends StatelessWidget {
+  final WellsController wellsController;
+  final ValueChanged<Well> onWellEdit;
+  const ProgramScreen({
+    super.key,
+    required this.wellsController,
+    required this.onWellEdit,
+  });
+  @override
+  Widget build(BuildContext context) => _WellPage(
+    title: 'Program Sulama',
+    subtitle: 'Sulama planlamak için kuyu seçin',
+    wellsController: wellsController,
+    onWellEdit: onWellEdit,
+  );
+}
+
+class InstantScreen extends StatelessWidget {
+  final WellsController wellsController;
+  final IrrigationController irrigationController;
+  final ValueChanged<Well> onWellEdit;
+  final VoidCallback onNavigateHome;
+  const InstantScreen({
+    super.key,
+    required this.wellsController,
+    required this.irrigationController,
+    required this.onWellEdit,
+    required this.onNavigateHome,
+  });
+  @override
+  Widget build(BuildContext context) => _WellPage(
+    title: 'Anlık Sulama',
+    subtitle: 'Hemen başlatmak için kuyu seçin',
+    wellsController: wellsController,
+    onWellEdit: onWellEdit,
+    irrigationController: irrigationController,
+    onNavigateHome: onNavigateHome,
+  );
+}
+
+class _WellPage extends StatelessWidget {
+  final String title, subtitle;
+  final WellsController wellsController;
+  final ValueChanged<Well> onWellEdit;
+  final IrrigationController? irrigationController;
+  final VoidCallback? onNavigateHome;
+  const _WellPage({
+    required this.title,
+    required this.subtitle,
+    required this.wellsController,
+    required this.onWellEdit,
+    this.irrigationController,
+    this.onNavigateHome,
+  });
+
+  @override
+  Widget build(BuildContext c) => ListenableBuilder(
+    listenable: wellsController,
+    builder: (context, _) => ListView(
+      padding: const EdgeInsets.fromLTRB(20, 2, 20, 104),
+      children: [
+        PageHeading(title: title, subtitle: subtitle),
+        const SizedBox(height: 20),
+        if (wellsController.isLoading)
+          const _CenteredNotice(text: 'Kuyular yükleniyor…')
+        else
+          WellList(
+            wells: wellsController.wells,
+            onWellEdit: onWellEdit,
+            irrigationController: irrigationController,
+            onNavigateHome: onNavigateHome,
+          ),
+      ],
+    ),
+  );
+}
+
+class _CenteredNotice extends StatelessWidget {
+  final String text;
+  const _CenteredNotice({required this.text});
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 48),
+    child: Center(
+      child: Text(
+        text,
+        style: figtree(size: 13, weight: W.semibold, color: AppColors.inkFaint),
+      ),
+    ),
+  );
+}
+
+class WellList extends StatefulWidget {
+  final List<Well> wells;
+  final ValueChanged<Well> onWellEdit;
+  final IrrigationController? irrigationController;
+  final VoidCallback? onNavigateHome;
+  const WellList({
+    super.key,
+    required this.wells,
+    required this.onWellEdit,
+    this.irrigationController,
+    this.onNavigateHome,
+  });
+  @override
+  State<WellList> createState() => _WellListState();
+}
+
+class _WellListState extends State<WellList> {
+  String query = '';
+
+  void _handleStart(Well well) {
+    final irrigationController = widget.irrigationController;
+    if (irrigationController == null) return;
+    if (irrigationController.isActiveForWell(well.id)) {
+      widget.onNavigateHome?.call();
+    } else {
+      irrigationController.start(well.id);
+    }
+  }
+
+  @override
+  Widget build(BuildContext c) {
+    final irrigationController = widget.irrigationController;
+    if (irrigationController == null) return _buildList();
+    // Sulama başlatıldığında/durdurulduğunda `_WellCard`'ın `started`
+    // bayrağı hemen güncellensin diye liste, dinlenen controller'ın
+    // builder'ı İÇİNDE yeniden kuruluyor; dışarıda önbelleklenmiş bir
+    // widget ağacı, notifyListeners() sonrası "Takip Et"e dönmüyordu.
+    return ListenableBuilder(
+      listenable: irrigationController,
+      builder: (context, _) => _buildList(),
+    );
+  }
+
+  Widget _buildList() {
+    final q = query.trim().toLowerCase();
+    final result = q.isEmpty
+        ? widget.wells
+        : widget.wells
+              .where(
+                (w) => '${w.name} ${w.province} ${w.district}'
+                    .toLowerCase()
+                    .contains(q),
+              )
+              .toList();
+
+    return Column(
+      children: [
+        GlassPanel(
+          borderRadius: BorderRadius.circular(12),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          elevated: false,
+          child: SizedBox(
+            height: 46,
+            child: Row(
+              children: [
+                AppIcons.search(size: 18, color: AppColors.inkFaint),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    onChanged: (v) => setState(() => query = v),
+                    style: figtree(size: 14, weight: W.semibold),
+                    decoration: InputDecoration(
+                      hintText: 'Kuyu Ara',
+                      hintStyle: figtree(
+                        size: 14,
+                        weight: W.medium,
+                        color: AppColors.inkFaint,
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        if (result.isEmpty)
+          GlassPanel(
+            borderRadius: BorderRadius.circular(21),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+            child: Column(
+              children: [
+                Text(
+                  'Kuyu bulunamadı',
+                  style: figtree(size: 14, weight: W.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Farklı bir isim veya ilçe deneyin.',
+                  style: figtree(
+                    size: 12.5,
+                    weight: W.medium,
+                    color: AppColors.inkSoft,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          for (final well in result) ...[
+            _WellCard(
+              well: well,
+              isInstant: widget.irrigationController != null,
+              started:
+                  widget.irrigationController?.isActiveForWell(well.id) ??
+                  false,
+              onEdit: () => widget.onWellEdit(well),
+              onStart: widget.irrigationController == null
+                  ? null
+                  : () => _handleStart(well),
+            ),
+            const SizedBox(height: 12),
+          ],
+      ],
+    );
+  }
+}
+
+class _WellCard extends StatelessWidget {
+  final Well well;
+  final bool isInstant, started;
+  final VoidCallback onEdit;
+  final VoidCallback? onStart;
+  const _WellCard({
+    required this.well,
+    required this.isInstant,
+    required this.started,
+    required this.onEdit,
+    this.onStart,
+  });
+  @override
+  Widget build(BuildContext c) => GlassPanel(
+    borderRadius: BorderRadius.circular(19),
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.brand100.withValues(alpha: .8),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: AppIcons.droplet(size: 18, color: AppColors.brand700),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: InkWell(
+                  onTap: onEdit,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      MarqueeText(
+                        key: ValueKey('well-name-${well.id}'),
+                        text: well.name,
+                        style: figtree(
+                          size: 15,
+                          weight: W.extrabold,
+                          tracking: Tracking.tight,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          AppIcons.mapPin(size: 11, color: AppColors.inkSoft),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              '${well.province} / ${well.district}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: figtree(
+                                size: 11.5,
+                                weight: W.semibold,
+                                color: AppColors.inkSoft,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (isInstant) ...[
+                const SizedBox(width: 8),
+                _StartButton(started: started, onTap: onStart!),
+              ] else
+                AppIcons.chevronRight(size: 16, color: AppColors.inkFaint),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final component in well.components)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: _WellComponentBadge(component: component),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _StartButton extends StatelessWidget {
+  final bool started;
+  final VoidCallback onTap;
+  const _StartButton({required this.started, required this.onTap});
+  @override
+  Widget build(BuildContext c) => PressableScale(
+    scale: .96,
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+      decoration: BoxDecoration(
+        color: started ? AppColors.sea600 : AppColors.brand600,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: (started ? AppColors.sea600 : AppColors.brand700).withValues(
+              alpha: 0.28,
+            ),
+            blurRadius: 16,
+            spreadRadius: -7,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (started)
+            const Icon(Icons.visibility_outlined, color: Colors.white, size: 13)
+          else
+            AppIcons.play(size: 13, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            started ? 'Takip Et' : 'Başlat',
+            style: figtree(size: 12, weight: W.bold, color: Colors.white),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _WellComponentBadge extends StatelessWidget {
+  final WellComponent component;
+  const _WellComponentBadge({required this.component});
+  @override
+  Widget build(BuildContext c) {
+    final ok = component.status == WellComponentStatus.online;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: ok
+            ? AppColors.brand100.withValues(alpha: .9)
+            : AppColors.red100.withValues(alpha: .9),
+        border: Border.all(color: ok ? AppColors.brand200 : AppColors.red200),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: ok ? AppColors.brand500 : AppColors.red500,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            _componentLabel(component.type).toUpperCase(),
+            style: figtree(
+              size: 10.5,
+              weight: W.bold,
+              color: ok ? AppColors.brand700 : AppColors.red600,
+              tracking: Tracking.tight,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class WellEditScreen extends StatelessWidget {
+  final WellsController wellsController;
+  final String? wellId;
+  const WellEditScreen({
+    super.key,
+    required this.wellsController,
+    required this.wellId,
+  });
+
+  Well? get _well {
+    final id = wellId;
+    return id == null ? null : wellsController.byId(id);
+  }
+
+  @override
+  Widget build(BuildContext c) {
+    final well = _well;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 2, 20, 104),
+      children: [
+        PageHeading(
+          title: well?.name ?? 'Kuyu Düzenle',
+          subtitle: 'Kuyu bilgilerini güncelleyin',
+        ),
+        const SizedBox(height: 20),
+        GlassPanel(
+          borderRadius: BorderRadius.circular(22),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 56),
+          child: Column(
+            children: [
+              Icon(Icons.edit_outlined, size: 40, color: AppColors.inkFaint),
+              const SizedBox(height: 12),
+              Text(
+                'Düzenleme Ekranı',
+                style: figtree(size: 15, weight: W.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Bu bölüm yakında aktif olacak.',
+                textAlign: TextAlign.center,
+                style: figtree(
+                  size: 13,
+                  weight: W.medium,
+                  color: AppColors.inkSoft,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}

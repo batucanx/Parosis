@@ -118,11 +118,13 @@ flutter test
 ├── ios/                  iOS/Xcode platform projesi
 ├── assets/               Logo ve yazı tipi varlıkları
 ├── lib/
-│   ├── data/             Geçici yerel veri modelleri
+│   ├── app/              Composition root, AppRoot kabuğu, typed navigasyon
+│   ├── core/             Result, formatlama gibi feature'dan bağımsız yardımcılar
+│   ├── features/         wells, irrigation, wallet, profile, payment_cards, home
+│   │                     (her biri domain/data/presentation katmanlarıyla)
 │   ├── icons/            Uygulama ikon bileşenleri
-│   ├── screens/          Uygulama ekranları
 │   ├── theme/            Renk ve tipografi sistemi
-│   └── widgets/          Paylaşılan arayüz bileşenleri
+│   └── widgets/          Paylaşılan arayüz bileşenleri (app-shell düzeyinde)
 ├── test/                 Flutter widget testleri
 ├── .github/workflows/    Otomatik analiz ve test iş akışı
 └── pubspec.yaml          Paket ve varlık tanımları
@@ -130,7 +132,8 @@ flutter test
 
 ## Güvenlik ve üretim notları
 
-- Mevcut `lib/data/mock_data.dart` dosyası arayüz geliştirme verileri içerir; üretim backend'i değildir.
+- Her feature'ın `data/repositories/Mock...Repository` sınıfı arayüz geliştirme verisi içerir; üretim backend'i değildir. API sözleşmesi geldiğinde yalnızca bu dosyalar `Remote...Repository` ile değiştirilir (bkz. `docs/architecture/API_READY_PLAN.md`).
+- Kayıtlı kartların yalnızca görünen alanları (etiket, son 4 hane, son kullanma, kart ağı, varsayılan bayrağı) cihazda `shared_preferences` ile saklanır; tam kart numarası veya CVV/CVC hiçbir zaman saklanmaz.
 - Gerçek kart numarası ve CVV/CVC uygulama içinde veya yerel depolamada saklanmamalıdır.
 - Kart saklama işlemi PCI DSS uyumlu ödeme kuruluşunun tokenizasyon sistemi üzerinden yürütülmelidir.
 - API adresleri, anahtarlar, sertifikalar ve imzalama dosyaları repoya eklenmemelidir.

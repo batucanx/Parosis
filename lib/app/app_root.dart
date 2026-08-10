@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../screens/balance_screens.dart';
-import '../screens/cards_modal.dart';
-import '../screens/home_screen.dart';
-import '../screens/profile_screen.dart';
-import '../screens/well_screens.dart';
-import '../theme/colors.dart';
-import '../widgets/app_header.dart';
-import '../widgets/bottom_nav.dart';
-import '../widgets/screen_in.dart';
+import 'package:parosis_sulama/features/home/presentation/screens/home_screen.dart';
+import 'package:parosis_sulama/features/payment_cards/presentation/screens/cards_modal.dart';
+import 'package:parosis_sulama/features/profile/presentation/screens/profile_screen.dart';
+import 'package:parosis_sulama/features/wallet/presentation/screens/balance_screens.dart';
+import 'package:parosis_sulama/features/wells/presentation/screens/well_screens.dart';
+import 'package:parosis_sulama/theme/colors.dart';
+import 'package:parosis_sulama/widgets/app_header.dart';
+import 'package:parosis_sulama/widgets/bottom_nav.dart';
+import 'package:parosis_sulama/widgets/screen_in.dart';
+
 import 'app_dependencies.dart';
 import 'navigation/app_destination.dart';
 
@@ -24,12 +25,10 @@ class AppRoot extends StatefulWidget {
 
 class _AppRootState extends State<AppRoot> {
   AppDestination _screen = AppDestination.home;
-  int _balance = 450;
   int? _lastTopUp;
   bool _showCardsModal = false;
   String? _selectedWellId;
   AppDestination _wellEditBackTarget = AppDestination.home;
-  ProfileInfoSection? _openProfileInfoSection;
   bool _menuOpen = false;
 
   void _go(AppDestination next) => setState(() {
@@ -45,16 +44,20 @@ class _AppRootState extends State<AppRoot> {
     _go(AppDestination.wellEdit);
   }
 
-  void _confirmTopUp(int amount) => setState(() {
-    _balance += amount;
-    _lastTopUp = amount;
-    _screen = AppDestination.balance;
-  });
+  Future<bool> _confirmTopUp(int amount) async {
+    final success = await widget.dependencies.walletController.topUp(amount);
+    if (success) {
+      setState(() {
+        _lastTopUp = amount;
+        _screen = AppDestination.balance;
+      });
+    }
+    return success;
+  }
 
   void _openCards() => setState(() => _showCardsModal = true);
 
-  bool get _hasOverlay =>
-      _menuOpen || _showCardsModal || _openProfileInfoSection != null;
+  bool get _hasOverlay => _menuOpen || _showCardsModal;
   bool get _isSubScreen => !_screen.isPrimary;
   AppDestination get _backTarget => switch (_screen) {
     AppDestination.program || AppDestination.instant => AppDestination.home,
@@ -70,38 +73,46 @@ class _AppRootState extends State<AppRoot> {
       setState(() => _menuOpen = false);
     } else if (_showCardsModal) {
       setState(() => _showCardsModal = false);
-    } else if (_openProfileInfoSection != null) {
-      setState(() => _openProfileInfoSection = null);
     } else if (_isSubScreen) {
       _go(_backTarget);
     }
   }
 
-  Widget _buildScreen() => switch (_screen) {
-    AppDestination.home => HomeScreen(
-      onProgramTap: () => _go(AppDestination.program),
-      onInstantTap: () => _go(AppDestination.instant),
-    ),
-    AppDestination.program => ProgramScreen(
-      onWellEdit: (well) => _openWellEdit(well.id),
-    ),
-    AppDestination.instant => InstantScreen(
-      onWellEdit: (well) => _openWellEdit(well.id),
-      onIrrigationStopped: () => _go(AppDestination.home),
-    ),
-    AppDestination.balance => BalanceScreen(
-      balance: _balance,
-      lastTopUp: _lastTopUp,
-      onTopUp: () => _go(AppDestination.topUp),
-    ),
-    AppDestination.topUp => TopUpScreen(onConfirm: _confirmTopUp),
-    AppDestination.profile => ProfileScreen(
-      onOpenCards: _openCards,
-      onOpenSheet: (section) =>
-          setState(() => _openProfileInfoSection = section),
-    ),
-    AppDestination.wellEdit => WellEditScreen(wellId: _selectedWellId),
-  };
+  Widget _buildScreen() {
+    final deps = widget.dependencies;
+    return switch (_screen) {
+      AppDestination.home => HomeScreen(
+        wellsController: deps.wellsController,
+        irrigationController: deps.irrigationController,
+        onProgramTap: () => _go(AppDestination.program),
+        onInstantTap: () => _go(AppDestination.instant),
+      ),
+      AppDestination.program => ProgramScreen(
+        wellsController: deps.wellsController,
+        onWellEdit: (well) => _openWellEdit(well.id),
+      ),
+      AppDestination.instant => InstantScreen(
+        wellsController: deps.wellsController,
+        irrigationController: deps.irrigationController,
+        onWellEdit: (well) => _openWellEdit(well.id),
+        onNavigateHome: () => _go(AppDestination.home),
+      ),
+      AppDestination.balance => BalanceScreen(
+        walletController: deps.walletController,
+        lastTopUp: _lastTopUp,
+        onTopUp: () => _go(AppDestination.topUp),
+      ),
+      AppDestination.topUp => TopUpScreen(onConfirm: _confirmTopUp),
+      AppDestination.profile => ProfileScreen(
+        profileController: deps.profileController,
+        onOpenCards: _openCards,
+      ),
+      AppDestination.wellEdit => WellEditScreen(
+        wellsController: deps.wellsController,
+        wellId: _selectedWellId,
+      ),
+    };
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -116,12 +127,15 @@ class _AppRootState extends State<AppRoot> {
           children: [
             Column(
               children: [
-                AppHeader(
-                  balance: _balance,
-                  onBalanceTap: () => _go(AppDestination.balance),
-                  onMenuTap: () => setState(() => _menuOpen = true),
-                  onBackTap: _handleBack,
-                  showBackButton: _isSubScreen,
+                ListenableBuilder(
+                  listenable: widget.dependencies.walletController,
+                  builder: (context, _) => AppHeader(
+                    balance: widget.dependencies.walletController.balance,
+                    onBalanceTap: () => _go(AppDestination.balance),
+                    onMenuTap: () => setState(() => _menuOpen = true),
+                    onBackTap: _handleBack,
+                    showBackButton: _isSubScreen,
+                  ),
                 ),
                 Expanded(
                   child: ScreenIn(
@@ -181,12 +195,8 @@ class _AppRootState extends State<AppRoot> {
             ),
             if (_showCardsModal)
               CardsModal(
+                controller: widget.dependencies.paymentCardsController,
                 onClose: () => setState(() => _showCardsModal = false),
-              ),
-            if (_openProfileInfoSection case final section?)
-              ProfileInfoSheet(
-                section: section,
-                onClose: () => setState(() => _openProfileInfoSection = null),
               ),
           ],
         ),

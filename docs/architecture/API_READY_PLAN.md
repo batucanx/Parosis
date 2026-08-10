@@ -132,6 +132,10 @@ Anti-pattern koruması:
 
 ## Faz 1 - Core ve composition root
 
+Durum: Tamamlandı. `core/result`, `core/formatting`, `AppDestination` typed
+navigasyon ve `AppDependencies` composition root (`AppDependencies.mock()`)
+kuruldu.
+
 Uygulama:
 
 1. Resmi Flutter örneğindeki `Result<T>`, `Ok<T>` ve `Error<T>` yapısını
@@ -162,6 +166,11 @@ Anti-pattern koruması:
 - Core içine feature entity veya fixture taşıma.
 
 ## Faz 2 - Immutable domain ve mock repository'ler
+
+Durum: Tamamlandı. Beş feature da immutable domain entity + `abstract
+interface class ...Repository` + `Mock...Repository` üçlüsüne sahip.
+`payment_cards`, görünen alanları (tam kart numarası/CVV hariç) cihazda
+`shared_preferences` ile kalıcı hâle getiriyor; diğer dördü bellek-içi.
 
 Uygulama sırası:
 
@@ -205,6 +214,13 @@ Anti-pattern koruması:
 
 ## Faz 3 - Controller ve async UI state
 
+Durum: Tamamlandı. Her feature'ın `ChangeNotifier` controller'ı
+loading/data/error alanları taşıyor, mutasyonlarda `isSubmitting` ile tekrar
+gönderimi engelliyor, ekranlar `ListenableBuilder` ile yalnız kendi
+controller'ını dinliyor. Home ekranındaki canlı süre sayacı, controller'a
+timer eklemek yerine widget'ın kendi `dispose()`'unda güvenle iptal edilen
+yerel bir `Timer` ile çözüldü.
+
 Uygulama:
 
 1. Feature başına yalnız gereken controller'ları `ChangeNotifier` ile oluştur.
@@ -235,6 +251,13 @@ Anti-pattern koruması:
 - `FutureBuilder` builder'ında navigation/snackbar/network side effect yapma.
 
 ## Faz 4 - Ekranları feature bazında taşıma
+
+Durum: Kısmen tamamlandı. Tüm ekranlar `lib/features/*/presentation/screens`
+altına taşındı, `lib/data/mock_data.dart` kaldırıldı, cross-feature
+presentation importu yok. Kalan iş: aşağıdaki madde 5 — 2.000 satırlık kart
+dosyasının kendi içinde alt dosyalara bölünmesi henüz yapılmadı; dosya
+taşındı ve artık repository/controller üzerinden çalışıyor, ama tek dosya
+olarak kalıyor.
 
 Her feature tek başına taşınır ve doğrulanır:
 
