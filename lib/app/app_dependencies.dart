@@ -1,3 +1,5 @@
+import 'package:parosis_sulama/features/auth/data/repositories/mock_auth_repository.dart';
+import 'package:parosis_sulama/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:parosis_sulama/features/irrigation/data/repositories/mock_irrigation_repository.dart';
 import 'package:parosis_sulama/features/irrigation/presentation/controllers/irrigation_controller.dart';
 import 'package:parosis_sulama/features/payment_cards/data/repositories/mock_payment_cards_repository.dart';
@@ -18,6 +20,7 @@ import 'package:parosis_sulama/features/wells/presentation/controllers/wells_con
 /// each `abstract interface class`.
 final class AppDependencies {
   AppDependencies({
+    required this.authController,
     required this.wellsController,
     required this.irrigationController,
     required this.walletController,
@@ -26,6 +29,7 @@ final class AppDependencies {
   });
 
   factory AppDependencies.mock() => AppDependencies(
+    authController: AuthController(repository: MockAuthRepository()),
     wellsController: WellsController(repository: MockWellRepository()),
     irrigationController: IrrigationController(
       repository: MockIrrigationRepository(),
@@ -37,6 +41,7 @@ final class AppDependencies {
     ),
   );
 
+  final AuthController authController;
   final WellsController wellsController;
   final IrrigationController irrigationController;
   final WalletController walletController;
@@ -44,6 +49,7 @@ final class AppDependencies {
   final PaymentCardsController paymentCardsController;
 
   void dispose() {
+    authController.dispose();
     wellsController.dispose();
     irrigationController.dispose();
     walletController.dispose();

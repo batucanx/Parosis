@@ -7,16 +7,40 @@ import 'package:parosis_sulama/app/app_dependencies.dart';
 import 'package:parosis_sulama/app/app_root.dart';
 import 'package:parosis_sulama/widgets/marquee_text.dart';
 
+/// Demo hesabıyla giriş yapılmış bir composition root döner — Home akışını
+/// doğrulayan testler login ekranını atlayıp doğrudan `AppRoot`'u görür.
+Future<AppDependencies> _signedInDependencies() async {
+  final dependencies = AppDependencies.mock();
+  final signedIn = await dependencies.authController.login(
+    email: 'demo@parosis.com',
+    password: 'Parosis123!',
+  );
+  assert(signedIn, 'Mock demo hesabıyla giriş başarısız oldu.');
+  return dependencies;
+}
+
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
 
+  testWidgets('Oturum yoksa açılışta giriş ekranı gösterilir', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(SulamaApp(dependencies: AppDependencies.mock()));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pump();
+
+    expect(find.text('Hesabınıza Giriş Yapın'), findsOneWidget);
+    expect(find.byType(AppRoot), findsNothing);
+  });
+
   testWidgets('Bağımlılıklar composition root üzerinden AppRoot’a aktarılır', (
     WidgetTester tester,
   ) async {
-    final dependencies = AppDependencies.mock();
+    final dependencies = await _signedInDependencies();
     await tester.pumpWidget(SulamaApp(dependencies: dependencies));
+    await tester.pump();
 
     final appRoot = tester.widget<AppRoot>(find.byType(AppRoot));
     expect(appRoot.dependencies, same(dependencies));
@@ -24,7 +48,9 @@ void main() {
   });
 
   testWidgets('App açılır ve ana ekran görünür', (WidgetTester tester) async {
-    await tester.pumpWidget(SulamaApp(dependencies: AppDependencies.mock()));
+    await tester.pumpWidget(
+      SulamaApp(dependencies: await _signedInDependencies()),
+    );
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.text('Ana Sayfa'), findsOneWidget);
@@ -36,7 +62,9 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(375, 812));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(SulamaApp(dependencies: AppDependencies.mock()));
+    await tester.pumpWidget(
+      SulamaApp(dependencies: await _signedInDependencies()),
+    );
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.bySemanticsLabel('Hızlı erişim menüsünü aç'), findsOneWidget);
@@ -159,7 +187,9 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(375, 812));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(SulamaApp(dependencies: AppDependencies.mock()));
+    await tester.pumpWidget(
+      SulamaApp(dependencies: await _signedInDependencies()),
+    );
     await tester.pump(const Duration(milliseconds: 400));
 
     await tester.tap(find.text('Profil'));
@@ -192,7 +222,9 @@ void main() {
   });
 
   testWidgets('Kart silme islemi onay ister', (WidgetTester tester) async {
-    await tester.pumpWidget(SulamaApp(dependencies: AppDependencies.mock()));
+    await tester.pumpWidget(
+      SulamaApp(dependencies: await _signedInDependencies()),
+    );
     await tester.pump(const Duration(milliseconds: 400));
 
     await tester.tap(find.text('Profil'));

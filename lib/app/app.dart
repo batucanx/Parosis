@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/colors.dart';
 import 'app_dependencies.dart';
-import 'app_root.dart';
+import 'app_gate.dart';
 
 class SulamaApp extends StatelessWidget {
   const SulamaApp({super.key, required this.dependencies});
@@ -23,7 +23,7 @@ class SulamaApp extends StatelessWidget {
           primary: AppColors.brand600,
         ),
       ),
-      home: AppRoot(dependencies: dependencies),
+      home: AppGate(dependencies: dependencies),
     );
   }
 }

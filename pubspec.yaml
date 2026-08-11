@@ -39,6 +39,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_svg: ^2.3.0
   shared_preferences: ^2.3.0
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:
@@ -64,6 +65,7 @@ flutter:
 
   assets:
     - assets/icons/logo.svg
+    - assets/icons/parosis_mark.svg
 
   fonts:
     - family: Figtree

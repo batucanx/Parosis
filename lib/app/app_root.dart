@@ -15,9 +15,10 @@ import 'navigation/app_destination.dart';
 
 /// Web prototipindeki tek ekran state machine'inin Flutter karşılığı.
 class AppRoot extends StatefulWidget {
-  const AppRoot({super.key, required this.dependencies});
+  const AppRoot({super.key, required this.dependencies, required this.onLogout});
 
   final AppDependencies dependencies;
+  final VoidCallback onLogout;
 
   @override
   State<AppRoot> createState() => _AppRootState();
@@ -187,6 +188,10 @@ class _AppRootState extends State<AppRoot> {
                     ? AppDrawerOverlay(
                         key: const ValueKey('quick-access-drawer'),
                         onClose: () => setState(() => _menuOpen = false),
+                        onLogout: () {
+                          setState(() => _menuOpen = false);
+                          widget.onLogout();
+                        },
                       )
                     : const SizedBox.shrink(
                         key: ValueKey('quick-access-drawer-closed'),

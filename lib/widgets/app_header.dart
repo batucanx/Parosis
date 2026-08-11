@@ -143,15 +143,30 @@ Widget _menuIcon(String key, {required double size, required Color color}) {
       return AppIcons.droplets(size: size, color: color);
     case 'listChecks':
       return AppIcons.listChecks(size: size, color: color);
+    case 'logout':
+      return AppIcons.logout(size: size, color: color);
     default:
       return AppIcons.history(size: size, color: color);
   }
 }
 
+const _logoutItem = (
+  icon: 'logout',
+  label: 'Çıkış Yap',
+  desc: 'Hesabınızdan çıkış yapın',
+  color: AppColors.red600,
+  bg: AppColors.red50,
+);
+
 /// Tam ekran hızlı erişim menüsü — AppRoot'un kök Stack'inde overlay olarak render edilir.
 class AppDrawerOverlay extends StatelessWidget {
   final VoidCallback onClose;
-  const AppDrawerOverlay({super.key, required this.onClose});
+  final VoidCallback onLogout;
+  const AppDrawerOverlay({
+    super.key,
+    required this.onClose,
+    required this.onLogout,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -193,6 +208,10 @@ class AppDrawerOverlay extends StatelessWidget {
                     isLast: i == _menuItems.length - 1,
                     onTap: onClose,
                   ),
+                const SizedBox(height: 8),
+                Divider(color: Colors.black.withValues(alpha: 0.07)),
+                const SizedBox(height: 4),
+                _MenuRow(item: _logoutItem, isLast: true, onTap: onLogout),
               ],
             ),
           ),

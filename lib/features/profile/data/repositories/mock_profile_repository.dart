@@ -2,9 +2,10 @@ import 'package:parosis_sulama/core/result/result.dart';
 import 'package:parosis_sulama/features/profile/domain/entities/user.dart';
 import 'package:parosis_sulama/features/profile/domain/repositories/profile_repository.dart';
 
-/// No login flow exists yet — the app runs as a single signed-in mock user
-/// until a real auth API is defined. Swapping this for a `RemoteProfileRepository`
-/// backed by an authenticated session is the only change needed later.
+/// `auth` feature owns the login session; this repository still returns a
+/// single fixed profile record until a real API links profile data to the
+/// authenticated session. Swapping this for a `RemoteProfileRepository` is
+/// the only change needed later.
 final class MockProfileRepository implements ProfileRepository {
   final User _user = const User(
     id: 'SLM-48210',

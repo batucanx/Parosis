@@ -387,6 +387,44 @@ class AppIcons {
     strokeWidth: strokeWidth,
   );
 
+  static Widget eye({
+    double size = 24,
+    Color color = Colors.black,
+    double strokeWidth = 1.8,
+  }) => _svg(
+    '<path d="M2.4 12S5.8 5.6 12 5.6 21.6 12 21.6 12 18.2 18.4 12 18.4 2.4 12 2.4 12Z" />'
+    '<circle cx="12" cy="12" r="3" />',
+    size: size,
+    color: color,
+    strokeWidth: strokeWidth,
+  );
+
+  static Widget eyeOff({
+    double size = 24,
+    Color color = Colors.black,
+    double strokeWidth = 1.8,
+  }) => _svg(
+    '<path d="M3.6 3.6l16.8 16.8" />'
+    '<path d="M10.6 5.7A10.4 10.4 0 0 1 12 5.6c6.2 0 9.6 6.4 9.6 6.4a15.6 15.6 0 0 1-3.5 4.4M7.2 7.3C4.4 9.1 2.4 12 2.4 12s3.4 6.4 9.6 6.4c1.4 0 2.7-.3 3.8-.8" />'
+    '<path d="M9.9 10a3 3 0 0 0 4.1 4.1" />',
+    size: size,
+    color: color,
+    strokeWidth: strokeWidth,
+  );
+
+  static Widget logout({
+    double size = 24,
+    Color color = Colors.black,
+    double strokeWidth = 1.8,
+  }) => _svg(
+    '<path d="M9 4.4H6.4A2 2 0 0 0 4.4 6.4v11.2a2 2 0 0 0 2 2H9" />'
+    '<path d="M16 15.6 20 12l-4-3.6" />'
+    '<path d="M20 12H9.6" />',
+    size: size,
+    color: color,
+    strokeWidth: strokeWidth,
+  );
+
   static Widget droplets({
     double size = 24,
     Color color = Colors.black,
