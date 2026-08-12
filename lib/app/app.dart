@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../theme/colors.dart';
 import 'app_dependencies.dart';
@@ -14,6 +15,13 @@ class SulamaApp extends StatelessWidget {
     return MaterialApp(
       title: 'Parosis Sulama',
       debugShowCheckedModeBanner: false,
+      locale: const Locale('tr'),
+      supportedLocales: const [Locale('tr'), Locale('en')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       theme: ThemeData(
         useMaterial3: true,
         fontFamily: 'Figtree',

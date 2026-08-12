@@ -11,10 +11,22 @@ import 'package:parosis_sulama/features/payment_cards/domain/repositories/paymen
 /// the full card number or CVV/CVC, matching the app's card-storage notice.
 /// A real backend + payment-provider tokenization replaces this store later
 /// without changing [PaymentCardsRepository]'s contract.
+///
+/// Storage is keyed per signed-in account (via [currentUserId], supplied by
+/// the composition root) so one user never sees another's cards. Only the
+/// fixed demo account (`auth`'s seed id) starts pre-populated with sample
+/// cards; every real registered user starts empty.
 final class MockPaymentCardsRepository implements PaymentCardsRepository {
-  static const _prefsKey = 'payment_cards_v1';
+  MockPaymentCardsRepository({required String? Function() currentUserId})
+    : _currentUserId = currentUserId;
+
+  final String? Function() _currentUserId;
+
+  static const _demoUserId = 'SLM-10001';
+  static const _prefsKeyPrefix = 'payment_cards_v1_';
 
   List<SavedCard>? _cache;
+  String? _cacheUserId;
   int _nextId = 1000;
 
   List<SavedCard> _seedCards() => const [
@@ -23,7 +35,7 @@ final class MockPaymentCardsRepository implements PaymentCardsRepository {
       label: 'Garanti Banka Kartım',
       last4: '4242',
       expiry: '08/27',
-      holderName: 'BATUHAN CANARACI',
+      holderName: 'DEMO KULLANICI',
       scheme: CardScheme.visa,
       isPrimary: true,
     ),
@@ -32,7 +44,7 @@ final class MockPaymentCardsRepository implements PaymentCardsRepository {
       label: 'Akbank Kredi Kartım',
       last4: '5500',
       expiry: '03/26',
-      holderName: 'BATUHAN CANARACI',
+      holderName: 'DEMO KULLANICI',
       scheme: CardScheme.mastercard,
       isPrimary: false,
     ),
@@ -58,26 +70,35 @@ final class MockPaymentCardsRepository implements PaymentCardsRepository {
     isPrimary: json['isPrimary'] as bool,
   );
 
+  String _prefsKeyFor(String userId) => '$_prefsKeyPrefix$userId';
+
   Future<List<SavedCard>> _ensureLoaded() async {
-    final cached = _cache;
-    if (cached != null) return cached;
+    final userId = _currentUserId();
+    if (userId == null) return const [];
+    if (_cache != null && _cacheUserId == userId) return _cache!;
 
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_prefsKey);
+    final raw = prefs.getString(_prefsKeyFor(userId));
     final cards = raw == null
-        ? _seedCards()
+        ? (userId == _demoUserId ? _seedCards() : const <SavedCard>[])
         : (jsonDecode(raw) as List)
               .map((e) => _fromJson(e as Map<String, dynamic>))
               .toList();
 
     _cache = cards;
-    if (raw == null) await _persist();
+    _cacheUserId = userId;
+    if (raw == null && cards.isNotEmpty) await _persist();
     return cards;
   }
 
   Future<void> _persist() async {
+    final userId = _currentUserId();
+    if (userId == null) return;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefsKey, jsonEncode(_cache!.map(_toJson).toList()));
+    await prefs.setString(
+      _prefsKeyFor(userId),
+      jsonEncode(_cache!.map(_toJson).toList()),
+    );
   }
 
   @override

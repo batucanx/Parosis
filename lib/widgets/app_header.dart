@@ -5,6 +5,7 @@ import '../core/formatting/currency_formatter.dart';
 import '../icons/app_icons.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
+import 'confirm_dialog.dart';
 import 'pressable_scale.dart';
 
 /// Üst çubuk: ana ekranlarda hamburger, alt ekranlarda geri; ortada logo,
@@ -113,29 +114,21 @@ class AppHeader extends StatelessWidget {
   }
 }
 
-const _menuItems = [
-  (
-    icon: 'droplets',
-    label: 'Kuyu Taleplerim',
-    desc: 'Açık ve bekleyen talepleriniz',
-    color: AppColors.brand700,
-    bg: AppColors.brand100,
-  ),
-  (
-    icon: 'listChecks',
-    label: 'Talepler',
-    desc: 'Tüm sulama talepleri',
-    color: AppColors.sea700,
-    bg: AppColors.sea100,
-  ),
-  (
-    icon: 'history',
-    label: 'Geçmiş Sulamalar',
-    desc: 'Tamamlanan sulama kayıtları',
-    color: AppColors.mist600,
-    bg: AppColors.mist100,
-  ),
-];
+const _requestsItem = (
+  icon: 'wellImage',
+  label: 'Kuyularım ve Taleplerim',
+  desc: 'Kuyu kayıt ve randevu talepleriniz',
+  color: AppColors.brand700,
+  bg: AppColors.brand100,
+);
+
+const _historyItem = (
+  icon: 'history',
+  label: 'Geçmiş Sulamalar',
+  desc: 'Tamamlanan sulama kayıtları',
+  color: AppColors.mist600,
+  bg: AppColors.mist100,
+);
 
 Widget _menuIcon(String key, {required double size, required Color color}) {
   switch (key) {
@@ -161,79 +154,117 @@ const _logoutItem = (
 /// Tam ekran hızlı erişim menüsü — AppRoot'un kök Stack'inde overlay olarak render edilir.
 class AppDrawerOverlay extends StatelessWidget {
   final VoidCallback onClose;
+  final VoidCallback onOpenRequests;
+  final VoidCallback onOpenHistory;
   final VoidCallback onLogout;
   const AppDrawerOverlay({
     super.key,
     required this.onClose,
+    required this.onOpenRequests,
+    required this.onOpenHistory,
     required this.onLogout,
   });
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      icon: Icons.logout_rounded,
+      title: 'Çıkış Yap',
+      message: 'Hesabınızdan çıkış yapmak istediğinizden emin misiniz?',
+      confirmLabel: 'Çıkış Yap',
+    );
+    if (confirmed) onLogout();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       color: AppColors.sheetBg,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 36, 20, 24),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SvgPicture.asset('assets/icons/logo.svg', height: 44),
-                const Spacer(),
-                PressableScale(
-                  onTap: onClose,
-                  child: Container(
-                    height: 36,
-                    width: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: AppIcons.x(size: 18, color: AppColors.inkSoft),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              children: [
-                for (var i = 0; i < _menuItems.length; i++)
-                  _MenuRow(
-                    item: _menuItems[i],
-                    isLast: i == _menuItems.length - 1,
+      // Arkaplan tüm ekranı (ev tuşu çizgisinin altı dahil) kesintisiz
+      // kaplasın, sadece alt kısımdaki versiyon yazısı ev tuşu çizgisinin
+      // üstünde kalsın diye güvenli alan içerikte uygulanıyor.
+      child: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 36, 20, 24),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SvgPicture.asset('assets/icons/logo.svg', height: 44),
+                  const Spacer(),
+                  PressableScale(
                     onTap: onClose,
+                    child: Container(
+                      height: 36,
+                      width: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: AppIcons.x(size: 18, color: AppColors.inkSoft),
+                      ),
+                    ),
                   ),
-                const SizedBox(height: 8),
-                Divider(color: Colors.black.withValues(alpha: 0.07)),
-                const SizedBox(height: 4),
-                _MenuRow(item: _logoutItem, isLast: true, onTap: onLogout),
-              ],
-            ),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(color: Colors.black.withValues(alpha: 0.06)),
+                ],
               ),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            width: double.infinity,
-            child: Text(
-              'Sulama Yönetim Sistemi v1.0',
-              textAlign: TextAlign.center,
-              style: figtree(
-                size: 11.5,
-                weight: W.medium,
-                color: AppColors.inkFaint,
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                children: [
+                  _MenuRow(
+                    item: _requestsItem,
+                    isLast: false,
+                    onTap: onOpenRequests,
+                  ),
+                  _MenuRow(
+                    item: _historyItem,
+                    isLast: true,
+                    onTap: onOpenHistory,
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  Divider(color: Colors.black.withValues(alpha: 0.07)),
+                  const SizedBox(height: 4),
+                  _MenuRow(
+                    item: _logoutItem,
+                    isLast: true,
+                    onTap: () => _confirmLogout(context),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: Colors.black.withValues(alpha: 0.06)),
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 16,
+              ),
+              width: double.infinity,
+              child: Text(
+                'Sulama Yönetim Sistemi v1.0',
+                textAlign: TextAlign.center,
+                style: figtree(
+                  size: 11.5,
+                  weight: W.medium,
+                  color: AppColors.inkFaint,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -274,7 +305,20 @@ class _MenuRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Center(
-                child: _menuIcon(item.icon, size: 20, color: item.color),
+                child: item.icon == 'wellImage'
+                    ? ColorFiltered(
+                        colorFilter: ColorFilter.mode(
+                          item.color,
+                          BlendMode.srcIn,
+                        ),
+                        child: Image.asset(
+                          'assets/icons/well_icon.png',
+                          width: 22,
+                          height: 22,
+                          fit: BoxFit.contain,
+                        ),
+                      )
+                    : _menuIcon(item.icon, size: 20, color: item.color),
               ),
             ),
             const SizedBox(width: 16),

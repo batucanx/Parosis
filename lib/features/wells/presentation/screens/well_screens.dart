@@ -1,6 +1,12 @@
+import 'dart:async';
+import 'dart:math';
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:parosis_sulama/features/irrigation/presentation/controllers/irrigation_controller.dart';
+import 'package:parosis_sulama/features/well_bookings/domain/entities/well_schedule_entry.dart';
+import 'package:parosis_sulama/features/well_bookings/presentation/controllers/well_bookings_controller.dart';
 import 'package:parosis_sulama/features/wells/domain/entities/well.dart';
 import 'package:parosis_sulama/features/wells/presentation/controllers/wells_controller.dart';
 import 'package:parosis_sulama/icons/app_icons.dart';
@@ -11,12 +17,65 @@ import 'package:parosis_sulama/widgets/marquee_text.dart';
 import 'package:parosis_sulama/widgets/page_heading.dart';
 import 'package:parosis_sulama/widgets/pressable_scale.dart';
 
+String _twoDigits(int n) => n.toString().padLeft(2, '0');
+String _formatDate(DateTime dt) =>
+    '${_twoDigits(dt.day)}.${_twoDigits(dt.month)}.${dt.year}';
+String _formatTime(DateTime dt) =>
+    '${_twoDigits(dt.hour)}:${_twoDigits(dt.minute)}';
+
 String _componentLabel(WellComponentType type) => switch (type) {
   WellComponentType.pump => 'Pompa',
   WellComponentType.thermal => 'Termik',
   WellComponentType.power => 'Enerji',
   WellComponentType.communication => 'Haberleşme',
 };
+
+String _formatElapsed(Duration d) {
+  final h = _twoDigits(d.inHours);
+  final m = _twoDigits(d.inMinutes % 60);
+  final s = _twoDigits(d.inSeconds % 60);
+  return '$h:$m:$s';
+}
+
+const _busyNamePool = [
+  'Ali Yurtseven',
+  'Mehmet Polat',
+  'Fatma Yılmaz',
+  'Hasan Demir',
+  'Ayşe Kara',
+];
+
+/// Anlık Sulama'da, donanımı tamamen sağlıklı bir kuyunun "Meşgul" (başka
+/// biri kullanıyor) durumunu deterministik olarak simüle eder — gerçek
+/// çoklu kullanıcı/kuyu sahipliği verisi olmadığı için (bkz. memory
+/// `project_well_ownership_deferred`) `well_bookings`/`irrigation` geçmişi
+/// ile aynı desende sahte ama sabit veri. `since`, ilk çağrıldığı anda
+/// dondurulup önbelleğe alınır ki geçen süre canlı sayaç gibi ilerlesin,
+/// her build'de "şimdi"ye göre kaymasın.
+final Map<String, DateTime> _busySinceCache = {};
+
+({String personName, DateTime since})? _syntheticBusyInfo(Well well) {
+  final hasIssue = well.components.any(
+    (c) => c.status == WellComponentStatus.offline,
+  );
+  if (hasIssue) return null;
+
+  final rng = Random(well.id.hashCode ^ 0x6d6573);
+  if (rng.nextDouble() >= 0.5) return null;
+
+  final since = _busySinceCache.putIfAbsent(well.id, () {
+    final hoursAgo = 1 + rng.nextInt(72);
+    final minutesAgo = rng.nextInt(60);
+    final secondsAgo = rng.nextInt(60);
+    return DateTime.now().subtract(
+      Duration(hours: hoursAgo, minutes: minutesAgo, seconds: secondsAgo),
+    );
+  });
+  final personName = _busyNamePool[well.id.hashCode.abs() % _busyNamePool.length];
+  return (personName: personName, since: since);
+}
+
+enum _InstantStatus { ready, started, stopping, busy, problem }
 
 class ProgramScreen extends StatelessWidget {
   final WellsController wellsController;
@@ -38,13 +97,11 @@ class ProgramScreen extends StatelessWidget {
 class InstantScreen extends StatelessWidget {
   final WellsController wellsController;
   final IrrigationController irrigationController;
-  final ValueChanged<Well> onWellEdit;
   final VoidCallback onNavigateHome;
   const InstantScreen({
     super.key,
     required this.wellsController,
     required this.irrigationController,
-    required this.onWellEdit,
     required this.onNavigateHome,
   });
   @override
@@ -52,7 +109,6 @@ class InstantScreen extends StatelessWidget {
     title: 'Anlık Sulama',
     subtitle: 'Hemen başlatmak için kuyu seçin',
     wellsController: wellsController,
-    onWellEdit: onWellEdit,
     irrigationController: irrigationController,
     onNavigateHome: onNavigateHome,
   );
@@ -61,14 +117,18 @@ class InstantScreen extends StatelessWidget {
 class _WellPage extends StatelessWidget {
   final String title, subtitle;
   final WellsController wellsController;
-  final ValueChanged<Well> onWellEdit;
+
+  /// Kuyu adına dokununca düzenleme/randevu ekranına gitme davranışı —
+  /// sadece Program Sulama'da var. Anlık Sulama'da kullanıcı kuyulara
+  /// müdahale edemesin diye null bırakılıyor (bkz. [InstantScreen]).
+  final ValueChanged<Well>? onWellEdit;
   final IrrigationController? irrigationController;
   final VoidCallback? onNavigateHome;
   const _WellPage({
     required this.title,
     required this.subtitle,
     required this.wellsController,
-    required this.onWellEdit,
+    this.onWellEdit,
     this.irrigationController,
     this.onNavigateHome,
   });
@@ -112,13 +172,13 @@ class _CenteredNotice extends StatelessWidget {
 
 class WellList extends StatefulWidget {
   final List<Well> wells;
-  final ValueChanged<Well> onWellEdit;
+  final ValueChanged<Well>? onWellEdit;
   final IrrigationController? irrigationController;
   final VoidCallback? onNavigateHome;
   const WellList({
     super.key,
     required this.wells,
-    required this.onWellEdit,
+    this.onWellEdit,
     this.irrigationController,
     this.onNavigateHome,
   });
@@ -128,6 +188,25 @@ class WellList extends StatefulWidget {
 
 class _WellListState extends State<WellList> {
   String query = '';
+  Timer? _busyTicker;
+
+  @override
+  void initState() {
+    super.initState();
+    // Anlık Sulama'daki "Meşgul" kartlarının süre sayacı canlı aksın diye —
+    // sadece bu ekranda (irrigationController varken) çalışır.
+    if (widget.irrigationController != null) {
+      _busyTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _busyTicker?.cancel();
+    super.dispose();
+  }
 
   void _handleStart(Well well) {
     final irrigationController = widget.irrigationController;
@@ -205,12 +284,15 @@ class _WellListState extends State<WellList> {
             child: Column(
               children: [
                 Text(
-                  'Kuyu bulunamadı',
+                  widget.wells.isEmpty ? 'Henüz kuyunuz yok' : 'Kuyu bulunamadı',
                   style: figtree(size: 14, weight: W.bold),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Farklı bir isim veya ilçe deneyin.',
+                  widget.wells.isEmpty
+                      ? 'Kuyu talebiniz onaylandığında burada görünecek.'
+                      : 'Farklı bir isim veya ilçe deneyin.',
+                  textAlign: TextAlign.center,
                   style: figtree(
                     size: 12.5,
                     weight: W.medium,
@@ -228,7 +310,11 @@ class _WellListState extends State<WellList> {
               started:
                   widget.irrigationController?.isActiveForWell(well.id) ??
                   false,
-              onEdit: () => widget.onWellEdit(well),
+              stopping:
+                  widget.irrigationController?.isStopping(well.id) ?? false,
+              onEdit: widget.onWellEdit == null
+                  ? null
+                  : () => widget.onWellEdit!(well),
               onStart: widget.irrigationController == null
                   ? null
                   : () => _handleStart(well),
@@ -242,177 +328,1342 @@ class _WellListState extends State<WellList> {
 
 class _WellCard extends StatelessWidget {
   final Well well;
-  final bool isInstant, started;
-  final VoidCallback onEdit;
+  final bool isInstant, started, stopping;
+
+  /// Anlık Sulama'da null — kullanıcı orada kuyulara müdahale edemez
+  /// (bkz. [InstantScreen]), kuyu adı dokunmaya tepki vermez.
+  final VoidCallback? onEdit;
   final VoidCallback? onStart;
   const _WellCard({
     required this.well,
     required this.isInstant,
     required this.started,
-    required this.onEdit,
+    required this.stopping,
+    this.onEdit,
     this.onStart,
   });
+
+  _InstantStatus get _status {
+    if (!isInstant) return _InstantStatus.ready;
+    if (stopping) return _InstantStatus.stopping;
+    if (started) return _InstantStatus.started;
+    final hasIssue = well.components.any(
+      (c) => c.status == WellComponentStatus.offline,
+    );
+    if (hasIssue) return _InstantStatus.problem;
+    if (_syntheticBusyInfo(well) != null) return _InstantStatus.busy;
+    return _InstantStatus.ready;
+  }
+
   @override
-  Widget build(BuildContext c) => GlassPanel(
-    borderRadius: BorderRadius.circular(19),
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.brand100.withValues(alpha: .8),
-                  borderRadius: BorderRadius.circular(12),
+  Widget build(BuildContext c) {
+    final status = _status;
+    final busyInfo = status == _InstantStatus.busy
+        ? _syntheticBusyInfo(well)
+        : null;
+
+    final card = GlassPanel(
+      borderRadius: BorderRadius.circular(19),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+        child: Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: stopping
+                        ? AppColors.mist100
+                        : AppColors.brand100.withValues(alpha: .8),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: AppIcons.droplet(
+                      size: 18,
+                      color: stopping ? AppColors.mist600 : AppColors.brand700,
+                    ),
+                  ),
                 ),
-                child: Center(
-                  child: AppIcons.droplet(size: 18, color: AppColors.brand700),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: InkWell(
-                  onTap: onEdit,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      MarqueeText(
-                        key: ValueKey('well-name-${well.id}'),
-                        text: well.name,
-                        style: figtree(
-                          size: 15,
-                          weight: W.extrabold,
-                          tracking: Tracking.tight,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: InkWell(
+                    onTap: onEdit,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        MarqueeText(
+                          key: ValueKey('well-name-${well.id}'),
+                          text: well.name,
+                          style: figtree(
+                            size: 15,
+                            weight: W.extrabold,
+                            tracking: Tracking.tight,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          AppIcons.mapPin(size: 11, color: AppColors.inkSoft),
-                          const SizedBox(width: 3),
-                          Expanded(
-                            child: Text(
-                              '${well.province} / ${well.district}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: figtree(
-                                size: 11.5,
-                                weight: W.semibold,
-                                color: AppColors.inkSoft,
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            AppIcons.mapPin(size: 11, color: AppColors.inkSoft),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(
+                                '${well.province} / ${well.district}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: figtree(
+                                  size: 11.5,
+                                  weight: W.semibold,
+                                  color: AppColors.inkSoft,
+                                ),
                               ),
                             ),
+                          ],
+                        ),
+                        if (busyInfo != null)
+                          _BusyStatusLine(
+                            personName: busyInfo.personName,
+                            since: busyInfo.since,
                           ),
-                        ],
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              if (isInstant) ...[
-                const SizedBox(width: 8),
-                _StartButton(started: started, onTap: onStart!),
-              ] else
-                AppIcons.chevronRight(size: 16, color: AppColors.inkFaint),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final component in well.components)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: _WellComponentBadge(component: component),
-                  ),
+                if (isInstant) ...[
+                  const SizedBox(width: 8),
+                  _StartButton(status: status, onTap: onStart!),
+                ] else
+                  AppIcons.chevronRight(size: 16, color: AppColors.inkFaint),
               ],
+            ),
+            const SizedBox(height: 12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final component in well.components)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: _WellComponentBadge(component: component),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (status != _InstantStatus.busy) return card;
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(21),
+        border: Border.all(color: AppColors.amber400, width: 2),
+      ),
+      child: card,
+    );
+  }
+}
+
+class _BusyStatusLine extends StatelessWidget {
+  final String personName;
+  final DateTime since;
+  const _BusyStatusLine({required this.personName, required this.since});
+
+  @override
+  Widget build(BuildContext context) {
+    final elapsed = DateTime.now().difference(since);
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: const BoxDecoration(
+              color: AppColors.amber400,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              '${personName.toUpperCase()} kullanıyor · ${_formatElapsed(elapsed)} süredir',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: figtree(size: 10.5, weight: W.bold, color: AppColors.amber800),
             ),
           ),
         ],
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _StartButton extends StatelessWidget {
-  final bool started;
+  final _InstantStatus status;
   final VoidCallback onTap;
-  const _StartButton({required this.started, required this.onTap});
+  const _StartButton({required this.status, required this.onTap});
+
   @override
-  Widget build(BuildContext c) => PressableScale(
-    scale: .96,
-    onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-      decoration: BoxDecoration(
-        color: started ? AppColors.sea600 : AppColors.brand600,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: (started ? AppColors.sea600 : AppColors.brand700).withValues(
-              alpha: 0.28,
+  Widget build(BuildContext c) => switch (status) {
+    _InstantStatus.stopping => const _PassiveChip(
+      background: AppColors.mist500,
+      textColor: Colors.white,
+      label: 'Kapatılıyor',
+      spinner: true,
+    ),
+    _InstantStatus.busy => const _PassiveChip(
+      background: AppColors.slate200,
+      textColor: AppColors.inkSoft,
+      label: 'Meşgul',
+    ),
+    _InstantStatus.problem => const _PassiveChip(
+      background: AppColors.red50,
+      textColor: AppColors.red600,
+      label: 'Sorun',
+      icon: Icons.error_outline_rounded,
+    ),
+    _InstantStatus.started => PressableScale(
+      scale: .96,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.sea600,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.sea600.withValues(alpha: 0.28),
+              blurRadius: 16,
+              spreadRadius: -7,
+              offset: const Offset(0, 8),
             ),
-            blurRadius: 16,
-            spreadRadius: -7,
-            offset: const Offset(0, 8),
-          ),
-        ],
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.visibility_outlined,
+              color: Colors.white,
+              size: 13,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'Takip Et',
+              style: figtree(size: 12, weight: W.bold, color: Colors.white),
+            ),
+          ],
+        ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (started)
-            const Icon(Icons.visibility_outlined, color: Colors.white, size: 13)
-          else
+    ),
+    _InstantStatus.ready => PressableScale(
+      scale: .96,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.brand600,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.brand700.withValues(alpha: 0.28),
+              blurRadius: 16,
+              spreadRadius: -7,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
             AppIcons.play(size: 13, color: Colors.white),
-          const SizedBox(width: 6),
-          Text(
-            started ? 'Takip Et' : 'Başlat',
-            style: figtree(size: 12, weight: W.bold, color: Colors.white),
-          ),
-        ],
+            const SizedBox(width: 6),
+            Text(
+              'Başlat',
+              style: figtree(size: 12, weight: W.bold, color: Colors.white),
+            ),
+          ],
+        ),
       ),
+    ),
+  };
+}
+
+class _PassiveChip extends StatelessWidget {
+  final Color background, textColor;
+  final String label;
+  final bool spinner;
+  final IconData? icon;
+  const _PassiveChip({
+    required this.background,
+    required this.textColor,
+    required this.label,
+    this.spinner = false,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+    decoration: BoxDecoration(
+      color: background,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (spinner)
+          SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.8,
+              color: textColor,
+            ),
+          )
+        else if (icon != null)
+          Icon(icon, size: 13, color: textColor),
+        if (spinner || icon != null) const SizedBox(width: 6),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: figtree(size: 12, weight: W.bold, color: textColor),
+        ),
+      ],
     ),
   );
 }
 
-class _WellComponentBadge extends StatelessWidget {
+class _WellComponentBadge extends StatefulWidget {
   final WellComponent component;
   const _WellComponentBadge({required this.component});
+
   @override
-  Widget build(BuildContext c) {
-    final ok = component.status == WellComponentStatus.online;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: ok
-            ? AppColors.brand100.withValues(alpha: .9)
-            : AppColors.red100.withValues(alpha: .9),
-        border: Border.all(color: ok ? AppColors.brand200 : AppColors.red200),
-        borderRadius: BorderRadius.circular(8),
+  State<_WellComponentBadge> createState() => _WellComponentBadgeState();
+}
+
+class _WellComponentBadgeState extends State<_WellComponentBadge>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _pulseController;
+
+  bool get _isOffline =>
+      widget.component.status != WellComponentStatus.online;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isOffline) _startPulse();
+  }
+
+  void _startPulse() {
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _WellComponentBadge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_isOffline && _pulseController == null) {
+      _startPulse();
+    } else if (!_isOffline && _pulseController != null) {
+      _pulseController!.dispose();
+      _pulseController = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = _componentLabel(widget.component.type);
+    if (!_isOffline) {
+      return _ComponentBadgeChrome(
+        label: label,
+        background: AppColors.brand100.withValues(alpha: .9),
+        border: AppColors.brand200,
+        dot: AppColors.brand500,
+        text: AppColors.brand700,
+      );
+    }
+
+    final controller = _pulseController;
+    if (controller == null || MediaQuery.disableAnimationsOf(context)) {
+      return _ComponentBadgeChrome(
+        label: label,
+        background: AppColors.red100.withValues(alpha: .9),
+        border: AppColors.red200,
+        dot: AppColors.red500,
+        text: AppColors.red600,
+      );
+    }
+
+    // Devre dışı bileşenlerde kullanıcının dikkatini çekmesi için hafif,
+    // yavaş (~2sn'de bir) bir renk nabzı — metin okunaklılığını korumak
+    // için sadece arkaplan/nokta rengi değişiyor, yazı sabit kalıyor.
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final t = Curves.easeInOut.transform(controller.value);
+        return _ComponentBadgeChrome(
+          label: label,
+          background: Color.lerp(
+            AppColors.red100.withValues(alpha: .9),
+            AppColors.red200.withValues(alpha: .9),
+            t,
+          )!,
+          border: AppColors.red200,
+          dot: Color.lerp(AppColors.red500, AppColors.red600, t)!,
+          text: AppColors.red600,
+        );
+      },
+    );
+  }
+}
+
+class _ComponentBadgeChrome extends StatelessWidget {
+  final String label;
+  final Color background, border, dot, text;
+  const _ComponentBadgeChrome({
+    required this.label,
+    required this.background,
+    required this.border,
+    required this.dot,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: background,
+      border: Border.all(color: border),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          label.toUpperCase(),
+          style: figtree(
+            size: 10.5,
+            weight: W.bold,
+            color: text,
+            tracking: Tracking.tight,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Program Sulama'dan bir kuyuya dokunulunca açılan randevu/sıra alma
+/// ekranı: Başlangıç seçimi, günün doluluk şeridi ve "Sıra Al" akışı.
+/// Anlık Sulama'da kullanıcı kuyulara müdahale edemediği için ([InstantScreen]
+/// kuyu adına dokunmayı devre dışı bırakır) buraya sadece Program
+/// Sulama'dan gelinir.
+class WellEditScreen extends StatefulWidget {
+  final WellsController wellsController;
+  final WellBookingsController wellBookingsController;
+  final String? wellId;
+
+  /// "Sıra Al" başarıyla gönderildikten sonra çağrılır — kullanıcıyı bu
+  /// ekrandan Program Sulama listesine geri döndürmek için.
+  final VoidCallback? onSubmitted;
+  const WellEditScreen({
+    super.key,
+    required this.wellsController,
+    required this.wellBookingsController,
+    required this.wellId,
+    this.onSubmitted,
+  });
+
+  @override
+  State<WellEditScreen> createState() => _WellEditScreenState();
+}
+
+class _WellEditScreenState extends State<WellEditScreen> {
+  static const _minDuration = Duration(minutes: 15);
+
+  late DateTime _start;
+
+  /// null = kullanıcı henüz süre seçmedi.
+  int? _durationHours;
+  int _durationMinutes = 0;
+  List<WellScheduleEntry> _daySchedule = const [];
+  List<WellScheduleEntry> _todaySchedule = const [];
+  bool _loadingSchedule = true;
+
+  Well? get _well {
+    final id = widget.wellId;
+    return id == null ? null : widget.wellsController.byId(id);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _start = _roundUpToNext5(DateTime.now());
+    _loadSchedules();
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  DateTime _roundUpToNext5(DateTime dt) {
+    final remainder = dt.minute % 5;
+    final add = remainder == 0 ? 0 : 5 - remainder;
+    return DateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute + add);
+  }
+
+  Future<void> _loadSchedules() async {
+    final well = _well;
+    if (well == null) return;
+    setState(() => _loadingSchedule = true);
+
+    final today = DateTime.now();
+    final sameDay = _isSameDay(_start, today);
+    final selected = await widget.wellBookingsController.loadDaySchedule(
+      wellId: well.id,
+      date: _start,
+    );
+    final todaySchedule = sameDay
+        ? selected
+        : await widget.wellBookingsController.loadDaySchedule(
+            wellId: well.id,
+            date: today,
+          );
+
+    if (!mounted) return;
+    setState(() {
+      _daySchedule = selected;
+      _todaySchedule = todaySchedule;
+      _loadingSchedule = false;
+    });
+  }
+
+  Future<void> _pickStartDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _start,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: now.add(const Duration(days: 60)),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _start = DateTime(
+        picked.year,
+        picked.month,
+        picked.day,
+        _start.hour,
+        _start.minute,
+      );
+    });
+    _loadSchedules();
+  }
+
+  Future<void> _pickStartTime() async {
+    final picked = await _showFriendlyTimePicker(
+      context,
+      TimeOfDay.fromDateTime(_start),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _start = DateTime(
+        _start.year,
+        _start.month,
+        _start.day,
+        picked.hour,
+        picked.minute,
+      );
+    });
+    _loadSchedules();
+  }
+
+  Future<void> _pickDuration() async {
+    final picked = await _showDurationPicker(
+      context,
+      initialHours: _durationHours ?? 0,
+      initialMinutes: _durationMinutes,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _durationHours = picked.hours;
+      _durationMinutes = picked.minutes;
+    });
+  }
+
+  DateTime get _end => _start.add(
+    Duration(hours: _durationHours ?? 0, minutes: _durationMinutes),
+  );
+  bool get _hasValidRange =>
+      _durationHours != null &&
+      Duration(hours: _durationHours!, minutes: _durationMinutes) >=
+          _minDuration;
+
+  bool _rangesOverlap(
+    DateTime aStart,
+    DateTime? aEnd,
+    DateTime bStart,
+    DateTime bEnd,
+  ) {
+    final effectiveAEnd = aEnd ?? DateTime(9999);
+    return aStart.isBefore(bEnd) && bStart.isBefore(effectiveAEnd);
+  }
+
+  WellScheduleEntry? get _conflict {
+    for (final entry in _daySchedule) {
+      if (entry.kind == WellScheduleEntryKind.mine) continue;
+      if (_rangesOverlap(entry.start, entry.end, _start, _end)) return entry;
+    }
+    return null;
+  }
+
+  Future<void> _submit() async {
+    final well = _well;
+    if (well == null || !_hasValidRange || _conflict != null) return;
+    final success = await widget.wellBookingsController.requestSlot(
+      wellId: well.id,
+      wellName: well.name,
+      start: _start,
+      end: _end,
+    );
+    if (!mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Randevu talebiniz gönderildi.')),
+      );
+      widget.onSubmitted?.call();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final well = _well;
+    if (well == null) {
+      return const _WellNotFoundNotice();
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 2, 20, 104),
+      children: [
+        PageHeading(
+          title: well.name,
+          subtitle: '${well.province} / ${well.district}',
+        ),
+        const SizedBox(height: 20),
+        _BookingRangePanel(
+          start: _start,
+          end: _end,
+          hasValidRange: _hasValidRange,
+          durationHours: _durationHours,
+          durationMinutes: _durationMinutes,
+          onPickStartDate: _pickStartDate,
+          onPickStartTime: _pickStartTime,
+          onPickDuration: _pickDuration,
+        ),
+        const SizedBox(height: 14),
+        _OccupancyPanel(
+          day: _start,
+          entries: _daySchedule,
+          selectedStart: _start,
+          selectedEnd: _end,
+          isLoading: _loadingSchedule,
+          conflict: _conflict,
+        ),
+        const SizedBox(height: 14),
+        ListenableBuilder(
+          listenable: widget.wellBookingsController,
+          builder: (context, _) => _SubmitPanel(
+            durationHours: _durationHours,
+            durationMinutes: _durationMinutes,
+            minDuration: _minDuration,
+            hasValidRange: _hasValidRange,
+            hasConflict: _conflict != null,
+            submitting: widget.wellBookingsController.isSubmitting,
+            onSubmit: _submit,
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Bu günün randevuları',
+          style: figtree(size: 15, weight: W.extrabold),
+        ),
+        const SizedBox(height: 12),
+        if (_loadingSchedule)
+          const _CenteredNotice(text: 'Randevular yükleniyor…')
+        else
+          _TodayAppointmentsList(entries: _todaySchedule),
+      ],
+    );
+  }
+}
+
+class _WellNotFoundNotice extends StatelessWidget {
+  const _WellNotFoundNotice();
+
+  @override
+  Widget build(BuildContext c) => ListView(
+    padding: const EdgeInsets.fromLTRB(20, 2, 20, 104),
+    children: [
+      const PageHeading(
+        title: 'Kuyu Düzenle',
+        subtitle: 'Kuyu bilgilerini güncelleyin',
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      const SizedBox(height: 20),
+      GlassPanel(
+        borderRadius: BorderRadius.circular(22),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 56),
+        child: Column(
+          children: [
+            Icon(Icons.search_off_rounded, size: 40, color: AppColors.inkFaint),
+            const SizedBox(height: 12),
+            Text('Kuyu bulunamadı', style: figtree(size: 15, weight: W.bold)),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+class _BookingRangePanel extends StatelessWidget {
+  final DateTime start, end;
+  final bool hasValidRange;
+  final int? durationHours;
+  final int durationMinutes;
+  final VoidCallback onPickStartDate, onPickStartTime, onPickDuration;
+  const _BookingRangePanel({
+    required this.start,
+    required this.end,
+    required this.hasValidRange,
+    required this.durationHours,
+    required this.durationMinutes,
+    required this.onPickStartDate,
+    required this.onPickStartTime,
+    required this.onPickDuration,
+  });
+
+  @override
+  Widget build(BuildContext context) => GlassPanel(
+    borderRadius: BorderRadius.circular(22),
+    padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _DateTimeColumn(
+          dotColor: AppColors.brand500,
+          label: 'BAŞLANGIÇ',
+          date: start,
+          onPickDate: onPickStartDate,
+          onPickTime: onPickStartTime,
+        ),
+        const SizedBox(height: 14),
+        _DurationField(
+          hours: durationHours,
+          minutes: durationMinutes,
+          onTap: onPickDuration,
+        ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 260),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
+            child: SizeTransition(
+              sizeFactor: animation,
+              axisAlignment: -1,
+              child: child,
+            ),
+          ),
+          child: hasValidRange
+              ? Padding(
+                  key: const ValueKey('end-row'),
+                  padding: const EdgeInsets.only(top: 12),
+                  child: _ComputedEndRow(end: end),
+                )
+              : const SizedBox.shrink(key: ValueKey('end-row-empty')),
+        ),
+      ],
+    ),
+  );
+}
+
+class _DurationField extends StatelessWidget {
+  final int? hours;
+  final int minutes;
+  final VoidCallback onTap;
+  const _DurationField({
+    required this.hours,
+    required this.minutes,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
         children: [
           Container(
             width: 6,
             height: 6,
             decoration: BoxDecoration(
-              color: ok ? AppColors.brand500 : AppColors.red500,
+              color: AppColors.brand500,
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 5),
+          const SizedBox(width: 6),
           Text(
-            _componentLabel(component.type).toUpperCase(),
+            'SULAMA SÜRESİ',
             style: figtree(
               size: 10.5,
+              weight: W.extrabold,
+              color: AppColors.inkSoft,
+              tracking: Tracking.wide,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      _PickerBox(
+        text: hours == null ? 'Süre seçin' : '$hours sa $minutes dk',
+        icon: Icons.timer_outlined,
+        onTap: onTap,
+      ),
+    ],
+  );
+}
+
+class _ComputedEndRow extends StatelessWidget {
+  final DateTime end;
+  const _ComputedEndRow({required this.end});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    decoration: BoxDecoration(
+      color: AppColors.brand50,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: AppColors.brand200.withValues(alpha: .6)),
+    ),
+    child: Row(
+      children: [
+        Icon(Icons.event_available_outlined, size: 16, color: AppColors.brand700),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'Bitiş: ${_formatDate(end)} ${_formatTime(end)}',
+            style: figtree(size: 12.5, weight: W.bold, color: AppColors.brand700),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _DateTimeColumn extends StatelessWidget {
+  final Color dotColor;
+  final String label;
+  final DateTime date;
+  final VoidCallback onPickDate, onPickTime;
+  const _DateTimeColumn({
+    required this.dotColor,
+    required this.label,
+    required this.date,
+    required this.onPickDate,
+    required this.onPickTime,
+  });
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: figtree(
+              size: 10.5,
+              weight: W.extrabold,
+              color: AppColors.inkSoft,
+              tracking: Tracking.wide,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      _PickerBox(
+        text: _formatDate(date),
+        icon: Icons.calendar_today_outlined,
+        onTap: onPickDate,
+      ),
+      const SizedBox(height: 8),
+      _PickerBox(
+        text: _formatTime(date),
+        icon: Icons.access_time_rounded,
+        onTap: onPickTime,
+      ),
+    ],
+  );
+}
+
+class _PickerBox extends StatelessWidget {
+  final String text;
+  final IconData icon;
+  final VoidCallback onTap;
+  const _PickerBox({
+    required this.text,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => PressableScale(
+    scale: .97,
+    onTap: onTap,
+    child: Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.surfaceBorder),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: figtree(size: 13.5, weight: W.bold),
+            ),
+          ),
+          Icon(icon, size: 16, color: AppColors.inkFaint),
+        ],
+      ),
+    ),
+  );
+}
+
+class _OccupancyPanel extends StatelessWidget {
+  final DateTime day;
+  final List<WellScheduleEntry> entries;
+  final DateTime selectedStart, selectedEnd;
+  final bool isLoading;
+  final WellScheduleEntry? conflict;
+  const _OccupancyPanel({
+    required this.day,
+    required this.entries,
+    required this.selectedStart,
+    required this.selectedEnd,
+    required this.isLoading,
+    required this.conflict,
+  });
+
+  @override
+  Widget build(BuildContext context) => GlassPanel(
+    borderRadius: BorderRadius.circular(20),
+    padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Günün doluluğu',
+                style: figtree(size: 13.5, weight: W.extrabold),
+              ),
+            ),
+            Text(
+              '00:00 – 24:00',
+              style: figtree(
+                size: 11,
+                weight: W.semibold,
+                color: AppColors.inkFaint,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: _DayOccupancyTimeline(
+            day: day,
+            entries: isLoading ? const [] : entries,
+            selectedStart: selectedStart,
+            selectedEnd: selectedEnd,
+          ),
+        ),
+        const SizedBox(height: 12),
+        const _TimelineLegend(),
+        if (conflict != null) ...[
+          const SizedBox(height: 10),
+          Text(
+            'Bu saat aralığı dolu: ${conflict!.personName}.',
+            style: figtree(
+              size: 11.5,
+              weight: W.semibold,
+              color: AppColors.red600,
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+class _DayOccupancyTimeline extends StatelessWidget {
+  final DateTime day;
+  final List<WellScheduleEntry> entries;
+  final DateTime selectedStart, selectedEnd;
+  const _DayOccupancyTimeline({
+    required this.day,
+    required this.entries,
+    required this.selectedStart,
+    required this.selectedEnd,
+  });
+
+  static const _dayMinutes = 24 * 60;
+
+  Color _colorFor(WellScheduleEntryKind kind) => switch (kind) {
+    WellScheduleEntryKind.mine => AppColors.brand500,
+    WellScheduleEntryKind.occupied => AppColors.mist500,
+    WellScheduleEntryKind.pendingApproval => AppColors.amber400,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final dayStart = DateTime(day.year, day.month, day.day);
+    final dayEnd = dayStart.add(const Duration(days: 1));
+
+    double offsetFraction(DateTime dt) {
+      final clamped = dt.isBefore(dayStart)
+          ? dayStart
+          : (dt.isAfter(dayEnd) ? dayEnd : dt);
+      return clamped.difference(dayStart).inMinutes / _dayMinutes;
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        return SizedBox(
+          height: 34,
+          child: Stack(
+            children: [
+              Container(color: AppColors.slate100),
+              for (final entry in entries)
+                Positioned(
+                  left: width * offsetFraction(entry.start),
+                  width: (width *
+                          (offsetFraction(entry.end ?? dayEnd) -
+                              offsetFraction(entry.start)))
+                      .clamp(2.0, width),
+                  top: 0,
+                  bottom: 0,
+                  child: Container(color: _colorFor(entry.kind)),
+                ),
+              if (selectedEnd.isAfter(dayStart) &&
+                  selectedStart.isBefore(dayEnd))
+                Positioned(
+                  left: width * offsetFraction(selectedStart),
+                  width: (width *
+                          (offsetFraction(selectedEnd) -
+                              offsetFraction(selectedStart)))
+                      .clamp(2.0, width),
+                  top: 0,
+                  bottom: 0,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.red500, width: 2),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _TimelineLegend extends StatelessWidget {
+  const _TimelineLegend();
+  @override
+  Widget build(BuildContext context) => const Wrap(
+    spacing: 14,
+    runSpacing: 6,
+    children: [
+      _LegendDot(color: AppColors.brand500, label: 'seninki'),
+      _LegendDot(color: AppColors.mist500, label: 'dolu'),
+      _LegendDot(color: AppColors.amber400, label: 'onay bekliyor'),
+    ],
+  );
+}
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  final String label;
+  const _LegendDot({required this.color, required this.label});
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 5),
+      Text(
+        label,
+        style: figtree(size: 11, weight: W.semibold, color: AppColors.inkSoft),
+      ),
+    ],
+  );
+}
+
+class _SubmitPanel extends StatelessWidget {
+  final int? durationHours;
+  final int durationMinutes;
+  final Duration minDuration;
+  final bool hasValidRange, hasConflict, submitting;
+  final VoidCallback onSubmit;
+  const _SubmitPanel({
+    required this.durationHours,
+    required this.durationMinutes,
+    required this.minDuration,
+    required this.hasValidRange,
+    required this.hasConflict,
+    required this.submitting,
+    required this.onSubmit,
+  });
+
+  static String _formatMinDuration(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
+    if (h == 0) return '$m dk';
+    if (m == 0) return '$h saat';
+    return '$h saat $m dk';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canSubmit = hasValidRange && !hasConflict && !submitting;
+    return GlassPanel(
+      borderRadius: BorderRadius.circular(20),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Süre: ',
+                  style: figtree(
+                    size: 12.5,
+                    weight: W.semibold,
+                    color: AppColors.inkSoft,
+                  ),
+                ),
+                TextSpan(
+                  text: durationHours == null
+                      ? '—'
+                      : '$durationHours sa $durationMinutes dk',
+                  style: figtree(size: 12.5, weight: W.extrabold),
+                ),
+                TextSpan(
+                  text: ' · en az ${_formatMinDuration(minDuration)}',
+                  style: figtree(
+                    size: 12,
+                    weight: W.medium,
+                    color: AppColors.inkFaint,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          PressableScale(
+            scale: .98,
+            disabled: !canSubmit,
+            onTap: onSubmit,
+            child: Container(
+              height: 52,
+              decoration: BoxDecoration(
+                color: canSubmit
+                    ? AppColors.nearBlack
+                    : AppColors.mist200.withValues(alpha: .7),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.watch_later_outlined,
+                    size: 18,
+                    color: canSubmit ? Colors.white : AppColors.mist600,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    submitting ? 'Gönderiliyor…' : 'Sıra Al',
+                    style: figtree(
+                      size: 14.5,
+                      weight: W.extrabold,
+                      color: canSubmit ? Colors.white : AppColors.mist600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (!hasValidRange) ...[
+            const SizedBox(height: 8),
+            Text(
+              durationHours == null
+                  ? 'Sulama süresini seçin.'
+                  : 'Süre en az ${_formatMinDuration(minDuration)} olmalı.',
+              style: figtree(
+                size: 11.5,
+                weight: W.semibold,
+                color: AppColors.red600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TodayAppointmentsList extends StatelessWidget {
+  final List<WellScheduleEntry> entries;
+  const _TodayAppointmentsList({required this.entries});
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.isEmpty) {
+      return GlassPanel(
+        borderRadius: BorderRadius.circular(16),
+        elevated: false,
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Center(
+          child: Text(
+            'Bugün için randevu yok.',
+            style: figtree(
+              size: 12.5,
+              weight: W.medium,
+              color: AppColors.inkFaint,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final sorted = [...entries]..sort((a, b) => a.start.compareTo(b.start));
+    return Column(
+      children: [
+        for (final entry in sorted) ...[
+          _AppointmentCard(entry: entry),
+          const SizedBox(height: 10),
+        ],
+      ],
+    );
+  }
+}
+
+class _AppointmentCard extends StatelessWidget {
+  final WellScheduleEntry entry;
+  const _AppointmentCard({required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final active = entry.isActiveAt(now);
+    final pending = entry.kind == WellScheduleEntryKind.pendingApproval;
+    final label = active ? 'aktif' : (pending ? 'onay bekliyor' : 'onaylandı');
+    final color = active
+        ? AppColors.brand600
+        : (pending ? AppColors.amber800 : AppColors.inkSoft);
+    final bg = active
+        ? AppColors.brand100
+        : (pending ? AppColors.amber50 : AppColors.slate100);
+    final endLabel = entry.end == null ? '∞' : _formatTime(entry.end!);
+
+    return GlassPanel(
+      borderRadius: BorderRadius.circular(16),
+      elevated: false,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '${_formatTime(entry.start)} - $endLabel',
+              style: figtree(size: 13.5, weight: W.extrabold),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (active) ...[
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                ],
+                Text(
+                  label,
+                  style: figtree(size: 10, weight: W.extrabold, color: color),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            entry.personName.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: figtree(
+              size: 11,
               weight: W.bold,
-              color: ok ? AppColors.brand700 : AppColors.red600,
+              color: AppColors.inkFaint,
               tracking: Tracking.tight,
             ),
           ),
@@ -422,56 +1673,335 @@ class _WellComponentBadge extends StatelessWidget {
   }
 }
 
-class WellEditScreen extends StatelessWidget {
-  final WellsController wellsController;
-  final String? wellId;
-  const WellEditScreen({
-    super.key,
-    required this.wellsController,
-    required this.wellId,
+/// Saatin küçük ekranda hassas seçilmesi zor olan analog kadran yerine,
+/// baş parmakla kaydırılan iki tekerlekli (saat/dakika) alt sayfa.
+Future<TimeOfDay?> _showFriendlyTimePicker(
+  BuildContext context,
+  TimeOfDay initial,
+) {
+  return showModalBottomSheet<TimeOfDay>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (context) => _TimePickerSheet(
+      initialHour: initial.hour,
+      initialMinute: initial.minute,
+    ),
+  );
+}
+
+/// Sulama süresini saat + dakika olarak seçmek için — kullanıcı "30 dk"
+/// gibi tam saate yuvarlanmayan bir oturum da açabilsin diye (tek başına
+/// "kaç saat" sayı girişi bunu desteklemiyordu).
+Future<({int hours, int minutes})?> _showDurationPicker(
+  BuildContext context, {
+  required int initialHours,
+  required int initialMinutes,
+}) {
+  return showModalBottomSheet<({int hours, int minutes})>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (context) => _DurationPickerSheet(
+      initialHours: initialHours,
+      initialMinutes: initialMinutes,
+    ),
+  );
+}
+
+class _DurationPickerSheet extends StatefulWidget {
+  final int initialHours;
+  final int initialMinutes;
+  const _DurationPickerSheet({
+    required this.initialHours,
+    required this.initialMinutes,
   });
 
-  Well? get _well {
-    final id = wellId;
-    return id == null ? null : wellsController.byId(id);
+  @override
+  State<_DurationPickerSheet> createState() => _DurationPickerSheetState();
+}
+
+class _DurationPickerSheetState extends State<_DurationPickerSheet> {
+  static const _maxHours = 99;
+
+  late int _hours = widget.initialHours.clamp(0, _maxHours);
+  late int _minutes = widget.initialMinutes.clamp(0, 59);
+
+  late final FixedExtentScrollController _hoursController;
+  late final FixedExtentScrollController _minutesController;
+
+  @override
+  void initState() {
+    super.initState();
+    _hoursController = FixedExtentScrollController(initialItem: _hours);
+    _minutesController = FixedExtentScrollController(initialItem: _minutes);
   }
 
   @override
-  Widget build(BuildContext c) {
-    final well = _well;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 2, 20, 104),
-      children: [
-        PageHeading(
-          title: well?.name ?? 'Kuyu Düzenle',
-          subtitle: 'Kuyu bilgilerini güncelleyin',
+  void dispose() {
+    _hoursController.dispose();
+    _minutesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        const SizedBox(height: 20),
-        GlassPanel(
-          borderRadius: BorderRadius.circular(22),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 56),
-          child: Column(
-            children: [
-              Icon(Icons.edit_outlined, size: 40, color: AppColors.inkFaint),
-              const SizedBox(height: 12),
-              Text(
-                'Düzenleme Ekranı',
-                style: figtree(size: 15, weight: W.bold),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceBorder,
+                borderRadius: BorderRadius.circular(999),
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Bu bölüm yakında aktif olacak.',
-                textAlign: TextAlign.center,
-                style: figtree(
-                  size: 13,
-                  weight: W.medium,
-                  color: AppColors.inkSoft,
+            ),
+            const SizedBox(height: 14),
+            Text('Süre Seç', style: figtree(size: 15, weight: W.extrabold)),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 170,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _TimeWheel(
+                      controller: _hoursController,
+                      itemCount: _maxHours + 1,
+                      labelOf: _twoDigits,
+                      onChanged: (i) => setState(() => _hours = i),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Text(
+                      'sa',
+                      style: figtree(
+                        size: 13,
+                        weight: W.bold,
+                        color: AppColors.inkFaint,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _TimeWheel(
+                      controller: _minutesController,
+                      itemCount: 60,
+                      labelOf: _twoDigits,
+                      onChanged: (i) => setState(() => _minutes = i),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Text(
+                      'dk',
+                      style: figtree(
+                        size: 13,
+                        weight: W.bold,
+                        color: AppColors.inkFaint,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            PressableScale(
+              scale: .98,
+              onTap: () => Navigator.of(
+                context,
+              ).pop((hours: _hours, minutes: _minutes)),
+              child: Container(
+                height: 50,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: AppColors.nearBlack,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: Text(
+                    'Tamam',
+                    style: figtree(
+                      size: 14.5,
+                      weight: W.extrabold,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
+}
+
+class _TimePickerSheet extends StatefulWidget {
+  final int initialHour;
+  final int initialMinute;
+  const _TimePickerSheet({
+    required this.initialHour,
+    required this.initialMinute,
+  });
+
+  @override
+  State<_TimePickerSheet> createState() => _TimePickerSheetState();
+}
+
+class _TimePickerSheetState extends State<_TimePickerSheet> {
+  late int _hour = widget.initialHour;
+  late int _minute = widget.initialMinute;
+
+  // Tekerlek kaydırıldıkça (onSelectedItemChanged -> setState) bu widget'lar
+  // yeniden build ediliyor; kontrolcü her build'de YENİDEN oluşturulursa
+  // CupertinoPicker'ın kaydırma fiziği kesintiye uğrayıp tekerlek elde
+  // zıplıyor/takılıyordu. Kontrolcüler burada bir kez oluşturulup dispose
+  // edilene kadar aynı kalıyor.
+  late final FixedExtentScrollController _hourController;
+  late final FixedExtentScrollController _minuteController;
+
+  @override
+  void initState() {
+    super.initState();
+    _hourController = FixedExtentScrollController(initialItem: _hour);
+    _minuteController = FixedExtentScrollController(initialItem: _minute);
+  }
+
+  @override
+  void dispose() {
+    _hourController.dispose();
+    _minuteController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceBorder,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text('Saat Seç', style: figtree(size: 15, weight: W.extrabold)),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 170,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _TimeWheel(
+                      controller: _hourController,
+                      itemCount: 24,
+                      labelOf: _twoDigits,
+                      onChanged: (i) => setState(() => _hour = i),
+                    ),
+                  ),
+                  Text(
+                    ':',
+                    style: figtree(
+                      size: 22,
+                      weight: W.extrabold,
+                      color: AppColors.inkFaint,
+                    ),
+                  ),
+                  Expanded(
+                    child: _TimeWheel(
+                      controller: _minuteController,
+                      itemCount: 60,
+                      labelOf: _twoDigits,
+                      onChanged: (i) => setState(() => _minute = i),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            PressableScale(
+              scale: .98,
+              onTap: () => Navigator.of(
+                context,
+              ).pop(TimeOfDay(hour: _hour, minute: _minute)),
+              child: Container(
+                height: 50,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: AppColors.nearBlack,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: Text(
+                    'Tamam',
+                    style: figtree(
+                      size: 14.5,
+                      weight: W.extrabold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TimeWheel extends StatelessWidget {
+  final FixedExtentScrollController controller;
+  final int itemCount;
+  final String Function(int) labelOf;
+  final ValueChanged<int> onChanged;
+  const _TimeWheel({
+    required this.controller,
+    required this.itemCount,
+    required this.labelOf,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) => CupertinoPicker(
+    scrollController: controller,
+    itemExtent: 40,
+    diameterRatio: 1.4,
+    onSelectedItemChanged: onChanged,
+    // Not: buraya opak bir `color` konursa listenin ÜSTÜNE bindiği için
+    // ortadaki seçili sayının yazısını tamamen gizler (rakam görünmez
+    // olur) — bu yüzden sadece kenarlık kullanılıyor, dolgu yok.
+    selectionOverlay: Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.brand300, width: 1.4),
+      ),
+    ),
+    children: [
+      for (var i = 0; i < itemCount; i++)
+        Center(
+          child: Text(labelOf(i), style: figtree(size: 19, weight: W.bold)),
+        ),
+    ],
+  );
 }

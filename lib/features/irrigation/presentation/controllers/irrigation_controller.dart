@@ -21,6 +21,9 @@ final class IrrigationController extends ChangeNotifier {
   bool _isSubmitting = false;
   Object? _error;
 
+  /// Onaylanıp "Durdur" işlemi devam eden kuyular — bkz. [isStopping].
+  final Set<String> _stoppingWellIds = {};
+
   List<ActiveIrrigation> get active => _active;
   List<UpcomingIrrigation> get upcoming => _upcoming;
   List<PastIrrigation> get past => _past;
@@ -30,6 +33,11 @@ final class IrrigationController extends ChangeNotifier {
 
   bool isActiveForWell(String wellId) =>
       _active.any((irrigation) => irrigation.wellId == wellId);
+
+  /// Kullanıcı "Durdur"u onayladıktan sonra, istek hâlâ işlenirken true —
+  /// Aktif Sulamalar kartının ve Anlık Sulama'daki kuyu kartının pasif/gri
+  /// "kapatılıyor" görünümünü tetiklemek için.
+  bool isStopping(String wellId) => _stoppingWellIds.contains(wellId);
 
   Future<void> _load() async {
     _isLoading = true;
@@ -80,8 +88,8 @@ final class IrrigationController extends ChangeNotifier {
   }
 
   Future<void> stop(String wellId) async {
-    if (_isSubmitting) return;
-    _isSubmitting = true;
+    if (isStopping(wellId)) return;
+    _stoppingWellIds.add(wellId);
     notifyListeners();
 
     switch (await _repository.stopIrrigation(wellId)) {
@@ -91,7 +99,7 @@ final class IrrigationController extends ChangeNotifier {
         _error = error;
     }
 
-    _isSubmitting = false;
+    _stoppingWellIds.remove(wellId);
     notifyListeners();
   }
 }

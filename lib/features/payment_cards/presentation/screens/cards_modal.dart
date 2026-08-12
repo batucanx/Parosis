@@ -396,6 +396,8 @@ class _CardsModalState extends State<CardsModal> {
                           ),
                         ),
                       )
+                    else if (widget.controller.displayCards.isEmpty)
+                      const _EmptyCardsState()
                     else
                       for (final card in widget.controller.displayCards) ...[
                         _CardRow(card: card, onTap: () => _openEdit(card)),
@@ -1836,6 +1838,46 @@ class _SchemeChip extends StatelessWidget {
         );
     }
   }
+}
+
+class _EmptyCardsState extends StatelessWidget {
+  const _EmptyCardsState();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 28),
+    child: Column(
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: AppColors.brand100,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Center(
+            child: AppIcons.creditCard(size: 24, color: AppColors.brand700),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          'Henüz kayıtlı kartınız yok',
+          style: figtree(size: 14.5, weight: W.extrabold),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Bakiye yüklemelerinde kullanabilmek için yukarıdan bir kart ekleyin.',
+          textAlign: TextAlign.center,
+          style: figtree(
+            size: 12.5,
+            weight: W.medium,
+            color: AppColors.inkSoft,
+            height: 1.4,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _CardRow extends StatelessWidget {

@@ -12,6 +12,13 @@ import 'package:parosis_sulama/widgets/slide_up_page_route.dart';
 
 enum ProfileInfoSection { user, contact }
 
+String _formatPhone(String phone) {
+  final digits = phone.replaceAll(RegExp(r'\D'), '');
+  if (digits.length != 11) return phone;
+  return '${digits.substring(0, 4)} ${digits.substring(4, 7)} '
+      '${digits.substring(7, 9)} ${digits.substring(9, 11)}';
+}
+
 String _initials(String fullName) {
   final parts = fullName
       .trim()
@@ -146,7 +153,7 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   label: 'Kayıtlı Kartlar',
                   subtitle: 'Ödeme yöntemleriniz',
-                  onTap: onOpenCards,
+                  onTap: () => _openCards(context),
                   last: true,
                 ),
               ],
@@ -239,7 +246,7 @@ class ProfileInfoScreen extends StatelessWidget {
                 ('Kullanıcı ID', user.id),
               ],
               ProfileInfoSection.contact => [
-                ('Telefon', user.phone),
+                ('Telefon', _formatPhone(user.phone)),
                 ('E-posta', user.email),
               ],
             };

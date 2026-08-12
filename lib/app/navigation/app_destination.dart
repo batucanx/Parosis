@@ -6,14 +6,20 @@ enum AppDestination {
   balance,
   topUp,
   profile,
-  wellEdit;
+  wellEdit,
+  requests,
+  pastIrrigations,
+  pastIrrigationDetail;
 
   /// The primary navigation destination represented by this screen.
   AppDestination get primaryDestination => switch (this) {
     AppDestination.home ||
     AppDestination.program ||
     AppDestination.instant ||
-    AppDestination.wellEdit => AppDestination.home,
+    AppDestination.wellEdit ||
+    AppDestination.requests ||
+    AppDestination.pastIrrigations ||
+    AppDestination.pastIrrigationDetail => AppDestination.home,
     AppDestination.balance || AppDestination.topUp => AppDestination.balance,
     AppDestination.profile => AppDestination.profile,
   };
@@ -25,6 +31,9 @@ enum AppDestination {
     AppDestination.program ||
     AppDestination.instant ||
     AppDestination.topUp ||
-    AppDestination.wellEdit => false,
+    AppDestination.wellEdit ||
+    AppDestination.requests ||
+    AppDestination.pastIrrigations ||
+    AppDestination.pastIrrigationDetail => false,
   };
 }

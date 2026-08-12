@@ -11,6 +11,7 @@ import 'package:parosis_sulama/features/wells/presentation/controllers/wells_con
 import 'package:parosis_sulama/icons/app_icons.dart';
 import 'package:parosis_sulama/theme/colors.dart';
 import 'package:parosis_sulama/theme/text_styles.dart';
+import 'package:parosis_sulama/widgets/confirm_dialog.dart';
 import 'package:parosis_sulama/widgets/glass.dart';
 import 'package:parosis_sulama/widgets/pressable_scale.dart';
 
@@ -124,6 +125,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   _ActiveIrrigationCard(
                     irrigation: irrigation,
                     well: widget.wellsController.byId(irrigation.wellId),
+                    stopping: widget.irrigationController.isStopping(
+                      irrigation.wellId,
+                    ),
                     onStop: () =>
                         widget.irrigationController.stop(irrigation.wellId),
                   ),
@@ -377,27 +381,46 @@ String _formatElapsed(Duration d) {
 class _ActiveIrrigationCard extends StatelessWidget {
   final ActiveIrrigation irrigation;
   final Well? well;
+  final bool stopping;
   final VoidCallback onStop;
   const _ActiveIrrigationCard({
     required this.irrigation,
     required this.well,
+    required this.stopping,
     required this.onStop,
   });
+
+  Future<void> _confirmStop(BuildContext context) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      icon: Icons.pause_circle_outline_rounded,
+      title: 'Sulamayı Durdur',
+      message:
+          '${well?.name ?? 'Bu kuyu'} için çalışan sulamayı durdurmak '
+          'istediğinizden emin misiniz?',
+      confirmLabel: 'Durdur',
+    );
+    if (confirmed) onStop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final elapsed = DateTime.now().difference(irrigation.startedAt);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [AppColors.brand600, AppColors.brand800],
+          colors: stopping
+              ? [AppColors.mist500, AppColors.mist600]
+              : [AppColors.brand600, AppColors.brand800],
         ),
         borderRadius: BorderRadius.circular(21),
         boxShadow: [
           BoxShadow(
-            color: AppColors.brand700.withValues(alpha: .80),
+            color: (stopping ? AppColors.mist600 : AppColors.brand700)
+                .withValues(alpha: .80),
             blurRadius: 30,
             spreadRadius: -12,
             offset: const Offset(0, 14),
@@ -502,7 +525,7 @@ class _ActiveIrrigationCard extends StatelessWidget {
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
-                        'Sulama çalışıyor',
+                        stopping ? 'Sulama durduruluyor…' : 'Sulama çalışıyor',
                         maxLines: 1,
                         overflow: TextOverflow.fade,
                         softWrap: false,
@@ -528,37 +551,65 @@ class _ActiveIrrigationCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          PressableScale(
-            scale: .98,
-            onTap: onStop,
-            child: Container(
+          if (stopping)
+            Container(
               height: 40,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Colors.white.withValues(alpha: .22),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
-                    Icons.pause_rounded,
-                    color: AppColors.brand700,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 7),
-                  Text(
-                    'Durdur',
-                    style: figtree(
-                      size: 13,
-                      weight: W.bold,
-                      color: AppColors.brand700,
+                  const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
                     ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Durduruluyor…',
+                    style: figtree(size: 13, weight: W.bold, color: Colors.white),
                   ),
                 ],
               ),
+            )
+          else
+            PressableScale(
+              scale: .98,
+              onTap: () => _confirmStop(context),
+              child: Container(
+                height: 40,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.pause_rounded,
+                      color: AppColors.brand700,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 7),
+                    Text(
+                      'Durdur',
+                      style: figtree(
+                        size: 13,
+                        weight: W.bold,
+                        color: AppColors.brand700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );

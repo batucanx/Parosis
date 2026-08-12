@@ -61,6 +61,15 @@ final class WalletController extends ChangeNotifier {
       case Ok<int>(:final value):
         _balance = value;
         success = true;
+        // Repository yeni satırı zaten kalıcı olarak ekledi — ekranın
+        // hemen göstermesi için ekstreyi de yeniden çekiyoruz, yoksa bu
+        // controller bir sonraki refresh()'e kadar eski listede kalırdı.
+        switch (await _repository.getStatement()) {
+          case Ok<List<StatementRow>>(value: final statement):
+            _statement = statement;
+          case Error<List<StatementRow>>():
+          // Bakiye güncellendi; ekstre bir sonraki refresh()'te düzelir.
+        }
       case Error<int>(:final error):
         _error = error;
     }

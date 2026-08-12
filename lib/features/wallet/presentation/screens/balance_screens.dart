@@ -68,9 +68,24 @@ class _BalanceScreenState extends State<BalanceScreen> {
             ),
             const SizedBox(height: 20),
           ],
-          GlassPanel(
-            borderRadius: BorderRadius.circular(28),
+          Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.brand400, AppColors.brand700],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.brand700.withValues(alpha: .35),
+                  blurRadius: 28,
+                  spreadRadius: -10,
+                  offset: const Offset(0, 14),
+                ),
+              ],
+            ),
             child: Column(
               children: [
                 Text(
@@ -78,7 +93,7 @@ class _BalanceScreenState extends State<BalanceScreen> {
                   style: figtree(
                     size: 15,
                     weight: W.bold,
-                    color: AppColors.inkSoft,
+                    color: Colors.white.withValues(alpha: .9),
                     tracking: Tracking.tight,
                   ),
                 ),
@@ -91,7 +106,7 @@ class _BalanceScreenState extends State<BalanceScreen> {
                         style: figtree(
                           size: 42,
                           weight: W.extrabold,
-                          color: AppColors.ink,
+                          color: Colors.white,
                           tracking: Tracking.tight,
                         ),
                       ),
@@ -100,7 +115,7 @@ class _BalanceScreenState extends State<BalanceScreen> {
                         style: figtree(
                           size: 20,
                           weight: W.bold,
-                          color: AppColors.inkSoft,
+                          color: Colors.white.withValues(alpha: .85),
                         ),
                       ),
                     ],

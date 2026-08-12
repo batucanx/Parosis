@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'package:parosis_sulama/features/home/presentation/screens/home_screen.dart';
-import 'package:parosis_sulama/features/payment_cards/presentation/screens/cards_modal.dart';
+import 'package:parosis_sulama/features/irrigation/presentation/screens/past_irrigations_screen.dart';
 import 'package:parosis_sulama/features/profile/presentation/screens/profile_screen.dart';
 import 'package:parosis_sulama/features/wallet/presentation/screens/balance_screens.dart';
+import 'package:parosis_sulama/features/well_requests/presentation/screens/requests_screen.dart';
 import 'package:parosis_sulama/features/wells/presentation/screens/well_screens.dart';
 import 'package:parosis_sulama/theme/colors.dart';
 import 'package:parosis_sulama/widgets/app_header.dart';
@@ -27,9 +28,9 @@ class AppRoot extends StatefulWidget {
 class _AppRootState extends State<AppRoot> {
   AppDestination _screen = AppDestination.home;
   int? _lastTopUp;
-  bool _showCardsModal = false;
   String? _selectedWellId;
   AppDestination _wellEditBackTarget = AppDestination.home;
+  String? _selectedHistoryWellId;
   bool _menuOpen = false;
 
   void _go(AppDestination next) => setState(() {
@@ -45,6 +46,11 @@ class _AppRootState extends State<AppRoot> {
     _go(AppDestination.wellEdit);
   }
 
+  void _openPastIrrigationDetail(String wellId) {
+    setState(() => _selectedHistoryWellId = wellId);
+    _go(AppDestination.pastIrrigationDetail);
+  }
+
   Future<bool> _confirmTopUp(int amount) async {
     final success = await widget.dependencies.walletController.topUp(amount);
     if (success) {
@@ -56,13 +62,15 @@ class _AppRootState extends State<AppRoot> {
     return success;
   }
 
-  void _openCards() => setState(() => _showCardsModal = true);
-
-  bool get _hasOverlay => _menuOpen || _showCardsModal;
+  bool get _hasOverlay => _menuOpen;
   bool get _isSubScreen => !_screen.isPrimary;
   AppDestination get _backTarget => switch (_screen) {
-    AppDestination.program || AppDestination.instant => AppDestination.home,
+    AppDestination.program ||
+    AppDestination.instant ||
+    AppDestination.requests ||
+    AppDestination.pastIrrigations => AppDestination.home,
     AppDestination.wellEdit => _wellEditBackTarget,
+    AppDestination.pastIrrigationDetail => AppDestination.pastIrrigations,
     AppDestination.topUp => AppDestination.balance,
     AppDestination.home ||
     AppDestination.balance ||
@@ -72,8 +80,6 @@ class _AppRootState extends State<AppRoot> {
   void _handleBack() {
     if (_menuOpen) {
       setState(() => _menuOpen = false);
-    } else if (_showCardsModal) {
-      setState(() => _showCardsModal = false);
     } else if (_isSubScreen) {
       _go(_backTarget);
     }
@@ -95,7 +101,6 @@ class _AppRootState extends State<AppRoot> {
       AppDestination.instant => InstantScreen(
         wellsController: deps.wellsController,
         irrigationController: deps.irrigationController,
-        onWellEdit: (well) => _openWellEdit(well.id),
         onNavigateHome: () => _go(AppDestination.home),
       ),
       AppDestination.balance => BalanceScreen(
@@ -106,11 +111,27 @@ class _AppRootState extends State<AppRoot> {
       AppDestination.topUp => TopUpScreen(onConfirm: _confirmTopUp),
       AppDestination.profile => ProfileScreen(
         profileController: deps.profileController,
-        onOpenCards: _openCards,
+        paymentCardsController: deps.paymentCardsController,
       ),
       AppDestination.wellEdit => WellEditScreen(
         wellsController: deps.wellsController,
+        wellBookingsController: deps.wellBookingsController,
         wellId: _selectedWellId,
+        onSubmitted: () => _go(_wellEditBackTarget),
+      ),
+      AppDestination.requests => RequestsScreen(
+        wellRequestsController: deps.wellRequestsController,
+        wellBookingsController: deps.wellBookingsController,
+      ),
+      AppDestination.pastIrrigations => PastIrrigationsScreen(
+        wellsController: deps.wellsController,
+        irrigationController: deps.irrigationController,
+        onSelectWell: (well) => _openPastIrrigationDetail(well.id),
+      ),
+      AppDestination.pastIrrigationDetail => PastIrrigationDetailScreen(
+        wellsController: deps.wellsController,
+        irrigationController: deps.irrigationController,
+        wellId: _selectedHistoryWellId,
       ),
     };
   }
@@ -119,6 +140,13 @@ class _AppRootState extends State<AppRoot> {
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: AppColors.canvas,
     body: SafeArea(
+      // Alt kenar burada korunmuyor — BottomNav'ın arkaplanı ekranın en
+      // altına kadar kesintisiz uzansın diye (TikTok tarzı, ev tuşu
+      // çizgisinin altında boşluk/renk uyuşmazlığı kalmasın). BottomNav
+      // kendi içeriğini (dokunma alanı) kendi SafeArea'sıyla koruyor —
+      // bkz. bottom_nav.dart. Ekran listelerinin zaten 104px alt boşluğu
+      // olduğu için içerik bu değişiklikten etkilenmiyor.
+      bottom: false,
       child: PopScope(
         canPop: !_hasOverlay && !_isSubScreen,
         onPopInvokedWithResult: (didPop, _) {
@@ -147,9 +175,9 @@ class _AppRootState extends State<AppRoot> {
               ],
             ),
             Positioned(
-              left: 12,
-              right: 12,
-              bottom: 16,
+              left: 0,
+              right: 0,
+              bottom: 0,
               child: BottomNav(
                 activeDestination: _screen.primaryDestination,
                 onChange: _go,
@@ -188,6 +216,14 @@ class _AppRootState extends State<AppRoot> {
                     ? AppDrawerOverlay(
                         key: const ValueKey('quick-access-drawer'),
                         onClose: () => setState(() => _menuOpen = false),
+                        onOpenRequests: () {
+                          setState(() => _menuOpen = false);
+                          _go(AppDestination.requests);
+                        },
+                        onOpenHistory: () {
+                          setState(() => _menuOpen = false);
+                          _go(AppDestination.pastIrrigations);
+                        },
                         onLogout: () {
                           setState(() => _menuOpen = false);
                           widget.onLogout();
@@ -198,11 +234,6 @@ class _AppRootState extends State<AppRoot> {
                       ),
               ),
             ),
-            if (_showCardsModal)
-              CardsModal(
-                controller: widget.dependencies.paymentCardsController,
-                onClose: () => setState(() => _showCardsModal = false),
-              ),
           ],
         ),
       ),

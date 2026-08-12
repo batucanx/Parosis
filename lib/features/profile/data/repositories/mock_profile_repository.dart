@@ -1,20 +1,32 @@
 import 'package:parosis_sulama/core/result/result.dart';
+import 'package:parosis_sulama/features/auth/domain/entities/auth_user.dart';
 import 'package:parosis_sulama/features/profile/domain/entities/user.dart';
 import 'package:parosis_sulama/features/profile/domain/repositories/profile_repository.dart';
 
-/// `auth` feature owns the login session; this repository still returns a
-/// single fixed profile record until a real API links profile data to the
-/// authenticated session. Swapping this for a `RemoteProfileRepository` is
-/// the only change needed later.
+/// Oturum açan hesabın profil kaydını döner. Bir gerçek API'de "mevcut
+/// kullanıcı" oturum token'ından çözülür; bu mock'ta aynı bilgiyi
+/// composition root'un sağladığı [currentAuthUser] üzerinden okur —
+/// `RemoteProfileRepository`'ye geçişte bu bağımlılık tamamen kalkar.
 final class MockProfileRepository implements ProfileRepository {
-  final User _user = const User(
-    id: 'SLM-48210',
-    fullName: 'Batuhan Canaracı',
-    email: 'batuhancanaraci85@gmail.com',
-    phone: '0532 118 04 76',
-    statusLabel: 'Aktif Üye',
-  );
+  MockProfileRepository({required AuthUser? Function() currentAuthUser})
+    : _currentAuthUser = currentAuthUser;
+
+  final AuthUser? Function() _currentAuthUser;
 
   @override
-  Future<Result<User>> getCurrentUser() async => Result.ok(_user);
+  Future<Result<User>> getCurrentUser() async {
+    final authUser = _currentAuthUser();
+    if (authUser == null) {
+      return Result.error(Exception('Oturum açılmamış.'));
+    }
+    return Result.ok(
+      User(
+        id: authUser.id,
+        fullName: authUser.fullName,
+        email: authUser.email,
+        phone: authUser.phone,
+        statusLabel: 'Aktif Üye',
+      ),
+    );
+  }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:parosis_sulama/features/payment_cards/data/repositories/mock_payment_cards_repository.dart';
+import 'package:parosis_sulama/features/payment_cards/domain/entities/saved_card.dart';
 import 'package:parosis_sulama/features/payment_cards/presentation/controllers/payment_cards_controller.dart';
 import 'package:parosis_sulama/features/payment_cards/presentation/screens/cards_modal.dart';
 
@@ -37,29 +38,26 @@ void main() {
       (tester) async {
         _configureView(tester, device);
         final controller = PaymentCardsController(
-          repository: MockPaymentCardsRepository(),
+          repository: MockPaymentCardsRepository(
+            currentUserId: () => 'test-user',
+          ),
         );
         addTearDown(controller.dispose);
+        await controller.addCard(
+          label: 'Garanti Banka Kartım',
+          last4: '4242',
+          expiry: '08/27',
+          holderName: 'TEST KULLANICI',
+          scheme: CardScheme.visa,
+          makePrimary: true,
+        );
 
         await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: SafeArea(
-                child: CardsModal(controller: controller, onClose: () {}),
-              ),
-            ),
-          ),
+          MaterialApp(home: CardsModal(controller: controller)),
         );
         await tester.pumpAndSettle();
 
-        final sheetRect = tester.getRect(
-          find.byKey(const ValueKey('overlay-sheet-panel')),
-        );
-        final availableHeight =
-            device.size.height - device.safeArea.top - device.safeArea.bottom;
-
-        expect(sheetRect.height, closeTo(availableHeight * 0.88, 1));
-        expect(sheetRect.top, greaterThan(device.safeArea.top));
+        expect(find.text('Kayıtlı Kartlar'), findsOneWidget);
         expect(tester.takeException(), isNull);
 
         await tester.tap(find.text('Garanti Banka Kartım'));
@@ -85,10 +83,6 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Kayıtlı Kartlar'), findsOneWidget);
-        expect(
-          find.byKey(const ValueKey('overlay-sheet-panel')),
-          findsOneWidget,
-        );
         expect(tester.takeException(), isNull);
       },
     );

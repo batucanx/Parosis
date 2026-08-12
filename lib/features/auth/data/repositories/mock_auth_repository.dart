@@ -73,7 +73,7 @@ final class MockAuthRepository implements AuthRepository {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_accountsKey);
     if (raw == null) {
-      _cache = _seedAccounts();
+      _cache = List<_Account>.of(_seedAccounts());
     } else {
       final decoded = jsonDecode(raw) as List<dynamic>;
       _cache = decoded
