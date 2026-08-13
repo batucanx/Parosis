@@ -1,4 +1,3 @@
-/// Formats the integer part of [value] with Turkish thousands separators.
 String formatTL(num value) {
   final isNegative = value < 0;
   final integerPart = value.abs().truncate().toString();

@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'package:parosis_sulama/features/irrigation/presentation/controllers/irrigation_controller.dart';
+import 'package:parosis_sulama/features/profile/presentation/controllers/profile_controller.dart';
 import 'package:parosis_sulama/features/well_bookings/domain/entities/well_schedule_entry.dart';
 import 'package:parosis_sulama/features/well_bookings/presentation/controllers/well_bookings_controller.dart';
 import 'package:parosis_sulama/features/wells/domain/entities/well.dart';
@@ -12,6 +13,7 @@ import 'package:parosis_sulama/features/wells/presentation/controllers/wells_con
 import 'package:parosis_sulama/icons/app_icons.dart';
 import 'package:parosis_sulama/theme/colors.dart';
 import 'package:parosis_sulama/theme/text_styles.dart';
+import 'package:parosis_sulama/widgets/confirm_dialog.dart';
 import 'package:parosis_sulama/widgets/glass.dart';
 import 'package:parosis_sulama/widgets/marquee_text.dart';
 import 'package:parosis_sulama/widgets/page_heading.dart';
@@ -71,7 +73,8 @@ final Map<String, DateTime> _busySinceCache = {};
       Duration(hours: hoursAgo, minutes: minutesAgo, seconds: secondsAgo),
     );
   });
-  final personName = _busyNamePool[well.id.hashCode.abs() % _busyNamePool.length];
+  final personName =
+      _busyNamePool[well.id.hashCode.abs() % _busyNamePool.length];
   return (personName: personName, since: since);
 }
 
@@ -97,12 +100,17 @@ class ProgramScreen extends StatelessWidget {
 class InstantScreen extends StatelessWidget {
   final WellsController wellsController;
   final IrrigationController irrigationController;
+  final ProfileController profileController;
   final VoidCallback onNavigateHome;
+
+  final VoidCallback onAddressRequired;
   const InstantScreen({
     super.key,
     required this.wellsController,
     required this.irrigationController,
+    required this.profileController,
     required this.onNavigateHome,
+    required this.onAddressRequired,
   });
   @override
   Widget build(BuildContext context) => _WellPage(
@@ -110,7 +118,9 @@ class InstantScreen extends StatelessWidget {
     subtitle: 'Hemen başlatmak için kuyu seçin',
     wellsController: wellsController,
     irrigationController: irrigationController,
+    profileController: profileController,
     onNavigateHome: onNavigateHome,
+    onAddressRequired: onAddressRequired,
   );
 }
 
@@ -123,21 +133,25 @@ class _WellPage extends StatelessWidget {
   /// müdahale edemesin diye null bırakılıyor (bkz. [InstantScreen]).
   final ValueChanged<Well>? onWellEdit;
   final IrrigationController? irrigationController;
+  final ProfileController? profileController;
   final VoidCallback? onNavigateHome;
+  final VoidCallback? onAddressRequired;
   const _WellPage({
     required this.title,
     required this.subtitle,
     required this.wellsController,
     this.onWellEdit,
     this.irrigationController,
+    this.profileController,
     this.onNavigateHome,
+    this.onAddressRequired,
   });
 
   @override
   Widget build(BuildContext c) => ListenableBuilder(
     listenable: wellsController,
     builder: (context, _) => ListView(
-      padding: const EdgeInsets.fromLTRB(20, 2, 20, 104),
+      padding: const EdgeInsets.fromLTRB(14, 2, 14, 104),
       children: [
         PageHeading(title: title, subtitle: subtitle),
         const SizedBox(height: 20),
@@ -148,7 +162,9 @@ class _WellPage extends StatelessWidget {
             wells: wellsController.wells,
             onWellEdit: onWellEdit,
             irrigationController: irrigationController,
+            profileController: profileController,
             onNavigateHome: onNavigateHome,
+            onAddressRequired: onAddressRequired,
           ),
       ],
     ),
@@ -174,13 +190,17 @@ class WellList extends StatefulWidget {
   final List<Well> wells;
   final ValueChanged<Well>? onWellEdit;
   final IrrigationController? irrigationController;
+  final ProfileController? profileController;
   final VoidCallback? onNavigateHome;
+  final VoidCallback? onAddressRequired;
   const WellList({
     super.key,
     required this.wells,
     this.onWellEdit,
     this.irrigationController,
+    this.profileController,
     this.onNavigateHome,
+    this.onAddressRequired,
   });
   @override
   State<WellList> createState() => _WellListState();
@@ -208,14 +228,32 @@ class _WellListState extends State<WellList> {
     super.dispose();
   }
 
-  void _handleStart(Well well) {
+  Future<void> _handleStart(Well well) async {
     final irrigationController = widget.irrigationController;
     if (irrigationController == null) return;
     if (irrigationController.isActiveForWell(well.id)) {
       widget.onNavigateHome?.call();
-    } else {
-      irrigationController.start(well.id);
+      return;
     }
+
+    final hasAddress =
+        widget.profileController?.user?.hasCompleteAddress ?? false;
+    if (!hasAddress) {
+      final goToAddress = await showConfirmDialog(
+        context,
+        icon: Icons.location_on_outlined,
+        title: 'Adres Bilgileri Gerekli',
+        message:
+            'Kuyuları başlatabilmek için adres bilgilerinizi doldurmanız '
+            'gerekmektedir.',
+        confirmLabel: 'Adres Bilgilerim',
+        cancelLabel: 'İptal',
+      );
+      if (goToAddress) widget.onAddressRequired?.call();
+      return;
+    }
+
+    irrigationController.start(well.id);
   }
 
   @override
@@ -238,7 +276,7 @@ class _WellListState extends State<WellList> {
         ? widget.wells
         : widget.wells
               .where(
-                (w) => '${w.name} ${w.province} ${w.district}'
+                (w) => '${w.name} ${w.ownerName} ${w.province} ${w.district}'
                     .toLowerCase()
                     .contains(q),
               )
@@ -284,7 +322,9 @@ class _WellListState extends State<WellList> {
             child: Column(
               children: [
                 Text(
-                  widget.wells.isEmpty ? 'Henüz kuyunuz yok' : 'Kuyu bulunamadı',
+                  widget.wells.isEmpty
+                      ? 'Henüz kuyunuz yok'
+                      : 'Kuyu bulunamadı',
                   style: figtree(size: 14, weight: W.bold),
                 ),
                 const SizedBox(height: 4),
@@ -365,29 +405,33 @@ class _WellCard extends StatelessWidget {
     final card = GlassPanel(
       borderRadius: BorderRadius.circular(19),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
         child: Column(
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: stopping
-                        ? AppColors.mist100
-                        : AppColors.brand100.withValues(alpha: .8),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: AppIcons.droplet(
-                      size: 18,
-                      color: stopping ? AppColors.mist600 : AppColors.brand700,
+                if (!isInstant) ...[
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: stopping
+                          ? AppColors.mist100
+                          : AppColors.brand100.withValues(alpha: .8),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: AppIcons.droplet(
+                        size: 18,
+                        color: stopping
+                            ? AppColors.mist600
+                            : AppColors.brand700,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
+                  const SizedBox(width: 10),
+                ],
                 Expanded(
                   child: InkWell(
                     onTap: onEdit,
@@ -403,10 +447,24 @@ class _WellCard extends StatelessWidget {
                             tracking: Tracking.tight,
                           ),
                         ),
+                        const SizedBox(height: 2),
+                        Text(
+                          well.ownerName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: figtree(
+                            size: 12,
+                            weight: W.bold,
+                            color: AppColors.inkSoft,
+                          ),
+                        ),
                         const SizedBox(height: 3),
                         Row(
                           children: [
-                            AppIcons.mapPin(size: 11, color: AppColors.inkSoft),
+                            AppIcons.mapPin(
+                              size: 11,
+                              color: AppColors.inkFaint,
+                            ),
                             const SizedBox(width: 3),
                             Expanded(
                               child: Text(
@@ -416,7 +474,7 @@ class _WellCard extends StatelessWidget {
                                 style: figtree(
                                   size: 11.5,
                                   weight: W.semibold,
-                                  color: AppColors.inkSoft,
+                                  color: AppColors.inkFaint,
                                 ),
                               ),
                             ),
@@ -445,7 +503,7 @@ class _WellCard extends StatelessWidget {
                 children: [
                   for (final component in well.components)
                     Padding(
-                      padding: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.only(right: 5),
                       child: _WellComponentBadge(component: component),
                     ),
                 ],
@@ -455,6 +513,10 @@ class _WellCard extends StatelessWidget {
         ),
       ),
     );
+
+    if (status == _InstantStatus.started) {
+      return _ActiveWellFrame(child: card);
+    }
 
     if (status != _InstantStatus.busy) return card;
     return Container(
@@ -468,6 +530,85 @@ class _WellCard extends StatelessWidget {
   }
 }
 
+class _ActiveWellFrame extends StatefulWidget {
+  final Widget child;
+  const _ActiveWellFrame({required this.child});
+
+  @override
+  State<_ActiveWellFrame> createState() => _ActiveWellFrameState();
+}
+
+class _ActiveWellFrameState extends State<_ActiveWellFrame>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 3),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return Container(
+        padding: const EdgeInsets.all(2.5),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(21.5),
+          border: Border.all(color: AppColors.brand500, width: 2.5),
+        ),
+        child: widget.child,
+      );
+    }
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) => CustomPaint(
+        painter: _RotatingFramePainter(progress: _controller.value),
+        child: child,
+      ),
+      child: Padding(padding: const EdgeInsets.all(2.5), child: widget.child),
+    );
+  }
+}
+
+class _RotatingFramePainter extends CustomPainter {
+  final double progress;
+  const _RotatingFramePainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    const strokeWidth = 2.5;
+    final rrect = RRect.fromRectAndRadius(
+      rect,
+      const Radius.circular(21.5),
+    ).deflate(strokeWidth / 2);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..shader = SweepGradient(
+        colors: [
+          AppColors.brand300.withValues(alpha: 0.3),
+          AppColors.brand300.withValues(alpha: 0.3),
+          AppColors.brand400,
+          AppColors.brand600,
+          AppColors.brand400,
+          AppColors.brand300.withValues(alpha: 0.3),
+        ],
+        stops: const [0.0, 0.6, 0.71, 0.8, 0.89, 1.0],
+        transform: GradientRotation(2 * pi * progress),
+      ).createShader(rect);
+    canvas.drawRRect(rrect, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _RotatingFramePainter oldDelegate) =>
+      oldDelegate.progress != progress;
+}
+
 class _BusyStatusLine extends StatelessWidget {
   final String personName;
   final DateTime since;
@@ -476,8 +617,14 @@ class _BusyStatusLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final elapsed = DateTime.now().difference(since);
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.amber50,
+        borderRadius: BorderRadius.circular(9),
+      ),
       child: Row(
         children: [
           Container(
@@ -488,13 +635,31 @@ class _BusyStatusLine extends StatelessWidget {
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 5),
+          const SizedBox(width: 6),
           Expanded(
-            child: Text(
-              '${personName.toUpperCase()} kullanıyor · ${_formatElapsed(elapsed)} süredir',
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: personName,
+                    style: figtree(
+                      size: 11,
+                      weight: W.extrabold,
+                      color: AppColors.amber800,
+                    ),
+                  ),
+                  TextSpan(
+                    text: ' kullanıyor · ${_formatElapsed(elapsed)} süredir',
+                    style: figtree(
+                      size: 11,
+                      weight: W.semibold,
+                      color: AppColors.amber800,
+                    ),
+                  ),
+                ],
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: figtree(size: 10.5, weight: W.bold, color: AppColors.amber800),
             ),
           ),
         ],
@@ -652,8 +817,7 @@ class _WellComponentBadgeState extends State<_WellComponentBadge>
     with SingleTickerProviderStateMixin {
   AnimationController? _pulseController;
 
-  bool get _isOffline =>
-      widget.component.status != WellComponentStatus.online;
+  bool get _isOffline => widget.component.status != WellComponentStatus.online;
 
   @override
   void initState() {
@@ -745,7 +909,7 @@ class _ComponentBadgeChrome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
     decoration: BoxDecoration(
       color: background,
       border: Border.all(color: border),
@@ -759,11 +923,11 @@ class _ComponentBadgeChrome extends StatelessWidget {
           height: 6,
           decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
         ),
-        const SizedBox(width: 5),
+        const SizedBox(width: 4),
         Text(
           label.toUpperCase(),
           style: figtree(
-            size: 10.5,
+            size: 10,
             weight: W.bold,
             color: text,
             tracking: Tracking.tight,
@@ -800,13 +964,11 @@ class WellEditScreen extends StatefulWidget {
 }
 
 class _WellEditScreenState extends State<WellEditScreen> {
-  static const _minDuration = Duration(minutes: 15);
+  static const _minDurationHours = 1;
 
   late DateTime _start;
 
-  /// null = kullanıcı henüz süre seçmedi.
   int? _durationHours;
-  int _durationMinutes = 0;
   List<WellScheduleEntry> _daySchedule = const [];
   List<WellScheduleEntry> _todaySchedule = const [];
   bool _loadingSchedule = true;
@@ -880,43 +1042,34 @@ class _WellEditScreenState extends State<WellEditScreen> {
   }
 
   Future<void> _pickStartTime() async {
-    final picked = await _showFriendlyTimePicker(
+    final picked = await _showHourPicker(
       context,
-      TimeOfDay.fromDateTime(_start),
+      title: 'Sulama Başlatma Saatini Seçin',
+      initialHour: _start.hour,
+      itemCount: 24,
     );
     if (picked == null || !mounted) return;
     setState(() {
-      _start = DateTime(
-        _start.year,
-        _start.month,
-        _start.day,
-        picked.hour,
-        picked.minute,
-      );
+      _start = DateTime(_start.year, _start.month, _start.day, picked);
     });
     _loadSchedules();
   }
 
   Future<void> _pickDuration() async {
-    final picked = await _showDurationPicker(
+    final picked = await _showHourPicker(
       context,
-      initialHours: _durationHours ?? 0,
-      initialMinutes: _durationMinutes,
+      title: 'Kaç Saat Sulama Yapılacak',
+      initialHour: _durationHours ?? 0,
+      itemCount: 100,
+      unitSuffix: 'saat',
     );
     if (picked == null || !mounted) return;
-    setState(() {
-      _durationHours = picked.hours;
-      _durationMinutes = picked.minutes;
-    });
+    setState(() => _durationHours = picked);
   }
 
-  DateTime get _end => _start.add(
-    Duration(hours: _durationHours ?? 0, minutes: _durationMinutes),
-  );
+  DateTime get _end => _start.add(Duration(hours: _durationHours ?? 0));
   bool get _hasValidRange =>
-      _durationHours != null &&
-      Duration(hours: _durationHours!, minutes: _durationMinutes) >=
-          _minDuration;
+      _durationHours != null && _durationHours! >= _minDurationHours;
 
   bool _rangesOverlap(
     DateTime aStart,
@@ -969,17 +1122,6 @@ class _WellEditScreenState extends State<WellEditScreen> {
           subtitle: '${well.province} / ${well.district}',
         ),
         const SizedBox(height: 20),
-        _BookingRangePanel(
-          start: _start,
-          end: _end,
-          hasValidRange: _hasValidRange,
-          durationHours: _durationHours,
-          durationMinutes: _durationMinutes,
-          onPickStartDate: _pickStartDate,
-          onPickStartTime: _pickStartTime,
-          onPickDuration: _pickDuration,
-        ),
-        const SizedBox(height: 14),
         _OccupancyPanel(
           day: _start,
           entries: _daySchedule,
@@ -989,12 +1131,21 @@ class _WellEditScreenState extends State<WellEditScreen> {
           conflict: _conflict,
         ),
         const SizedBox(height: 14),
+        _BookingRangePanel(
+          start: _start,
+          end: _end,
+          hasValidRange: _hasValidRange,
+          durationHours: _durationHours,
+          onPickStartDate: _pickStartDate,
+          onPickStartTime: _pickStartTime,
+          onPickDuration: _pickDuration,
+        ),
+        const SizedBox(height: 14),
         ListenableBuilder(
           listenable: widget.wellBookingsController,
           builder: (context, _) => _SubmitPanel(
             durationHours: _durationHours,
-            durationMinutes: _durationMinutes,
-            minDuration: _minDuration,
+            minDurationHours: _minDurationHours,
             hasValidRange: _hasValidRange,
             hasConflict: _conflict != null,
             submitting: widget.wellBookingsController.isSubmitting,
@@ -1047,14 +1198,12 @@ class _BookingRangePanel extends StatelessWidget {
   final DateTime start, end;
   final bool hasValidRange;
   final int? durationHours;
-  final int durationMinutes;
   final VoidCallback onPickStartDate, onPickStartTime, onPickDuration;
   const _BookingRangePanel({
     required this.start,
     required this.end,
     required this.hasValidRange,
     required this.durationHours,
-    required this.durationMinutes,
     required this.onPickStartDate,
     required this.onPickStartTime,
     required this.onPickDuration,
@@ -1069,17 +1218,12 @@ class _BookingRangePanel extends StatelessWidget {
       children: [
         _DateTimeColumn(
           dotColor: AppColors.brand500,
-          label: 'BAŞLANGIÇ',
           date: start,
           onPickDate: onPickStartDate,
           onPickTime: onPickStartTime,
         ),
         const SizedBox(height: 14),
-        _DurationField(
-          hours: durationHours,
-          minutes: durationMinutes,
-          onTap: onPickDuration,
-        ),
+        _DurationField(hours: durationHours, onTap: onPickDuration),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 260),
           switchInCurve: Curves.easeOutCubic,
@@ -1105,45 +1249,49 @@ class _BookingRangePanel extends StatelessWidget {
   );
 }
 
+class _DotLabel extends StatelessWidget {
+  final Color dotColor;
+  final String text;
+  const _DotLabel({required this.dotColor, required this.text});
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Container(
+        width: 6,
+        height: 6,
+        decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 6),
+      Text(
+        text,
+        style: figtree(
+          size: 10.5,
+          weight: W.extrabold,
+          color: AppColors.inkSoft,
+          tracking: Tracking.wide,
+        ),
+      ),
+    ],
+  );
+}
+
 class _DurationField extends StatelessWidget {
   final int? hours;
-  final int minutes;
   final VoidCallback onTap;
-  const _DurationField({
-    required this.hours,
-    required this.minutes,
-    required this.onTap,
-  });
+  const _DurationField({required this.hours, required this.onTap});
 
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Row(
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: AppColors.brand500,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            'SULAMA SÜRESİ',
-            style: figtree(
-              size: 10.5,
-              weight: W.extrabold,
-              color: AppColors.inkSoft,
-              tracking: Tracking.wide,
-            ),
-          ),
-        ],
+      const _DotLabel(
+        dotColor: AppColors.brand500,
+        text: 'KAÇ SAAT SULAMA YAPILACAK',
       ),
       const SizedBox(height: 8),
       _PickerBox(
-        text: hours == null ? 'Süre seçin' : '$hours sa $minutes dk',
+        text: hours == null ? 'Süre seçin' : '$hours saat',
         icon: Icons.timer_outlined,
         onTap: onTap,
       ),
@@ -1165,12 +1313,20 @@ class _ComputedEndRow extends StatelessWidget {
     ),
     child: Row(
       children: [
-        Icon(Icons.event_available_outlined, size: 16, color: AppColors.brand700),
+        Icon(
+          Icons.event_available_outlined,
+          size: 16,
+          color: AppColors.brand700,
+        ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             'Bitiş: ${_formatDate(end)} ${_formatTime(end)}',
-            style: figtree(size: 12.5, weight: W.bold, color: AppColors.brand700),
+            style: figtree(
+              size: 12.5,
+              weight: W.bold,
+              color: AppColors.brand700,
+            ),
           ),
         ),
       ],
@@ -1180,12 +1336,10 @@ class _ComputedEndRow extends StatelessWidget {
 
 class _DateTimeColumn extends StatelessWidget {
   final Color dotColor;
-  final String label;
   final DateTime date;
   final VoidCallback onPickDate, onPickTime;
   const _DateTimeColumn({
     required this.dotColor,
-    required this.label,
     required this.date,
     required this.onPickDate,
     required this.onPickTime,
@@ -1195,31 +1349,15 @@ class _DateTimeColumn extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Row(
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: figtree(
-              size: 10.5,
-              weight: W.extrabold,
-              color: AppColors.inkSoft,
-              tracking: Tracking.wide,
-            ),
-          ),
-        ],
-      ),
+      _DotLabel(dotColor: dotColor, text: 'SULAMA BAŞLATMA TARİHİNİ SEÇİN'),
       const SizedBox(height: 8),
       _PickerBox(
         text: _formatDate(date),
         icon: Icons.calendar_today_outlined,
         onTap: onPickDate,
       ),
+      const SizedBox(height: 14),
+      _DotLabel(dotColor: dotColor, text: 'SULAMA BAŞLATMA SAATİNİ SEÇİN'),
       const SizedBox(height: 8),
       _PickerBox(
         text: _formatTime(date),
@@ -1379,10 +1517,11 @@ class _DayOccupancyTimeline extends StatelessWidget {
               for (final entry in entries)
                 Positioned(
                   left: width * offsetFraction(entry.start),
-                  width: (width *
-                          (offsetFraction(entry.end ?? dayEnd) -
-                              offsetFraction(entry.start)))
-                      .clamp(2.0, width),
+                  width:
+                      (width *
+                              (offsetFraction(entry.end ?? dayEnd) -
+                                  offsetFraction(entry.start)))
+                          .clamp(2.0, width),
                   top: 0,
                   bottom: 0,
                   child: Container(color: _colorFor(entry.kind)),
@@ -1391,10 +1530,11 @@ class _DayOccupancyTimeline extends StatelessWidget {
                   selectedStart.isBefore(dayEnd))
                 Positioned(
                   left: width * offsetFraction(selectedStart),
-                  width: (width *
-                          (offsetFraction(selectedEnd) -
-                              offsetFraction(selectedStart)))
-                      .clamp(2.0, width),
+                  width:
+                      (width *
+                              (offsetFraction(selectedEnd) -
+                                  offsetFraction(selectedStart)))
+                          .clamp(2.0, width),
                   top: 0,
                   bottom: 0,
                   child: DecoratedBox(
@@ -1449,27 +1589,17 @@ class _LegendDot extends StatelessWidget {
 
 class _SubmitPanel extends StatelessWidget {
   final int? durationHours;
-  final int durationMinutes;
-  final Duration minDuration;
+  final int minDurationHours;
   final bool hasValidRange, hasConflict, submitting;
   final VoidCallback onSubmit;
   const _SubmitPanel({
     required this.durationHours,
-    required this.durationMinutes,
-    required this.minDuration,
+    required this.minDurationHours,
     required this.hasValidRange,
     required this.hasConflict,
     required this.submitting,
     required this.onSubmit,
   });
-
-  static String _formatMinDuration(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes % 60;
-    if (h == 0) return '$m dk';
-    if (m == 0) return '$h saat';
-    return '$h saat $m dk';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1492,13 +1622,11 @@ class _SubmitPanel extends StatelessWidget {
                   ),
                 ),
                 TextSpan(
-                  text: durationHours == null
-                      ? '—'
-                      : '$durationHours sa $durationMinutes dk',
+                  text: durationHours == null ? '—' : '$durationHours saat',
                   style: figtree(size: 12.5, weight: W.extrabold),
                 ),
                 TextSpan(
-                  text: ' · en az ${_formatMinDuration(minDuration)}',
+                  text: ' · en az $minDurationHours saat',
                   style: figtree(
                     size: 12,
                     weight: W.medium,
@@ -1547,7 +1675,7 @@ class _SubmitPanel extends StatelessWidget {
             Text(
               durationHours == null
                   ? 'Sulama süresini seçin.'
-                  : 'Süre en az ${_formatMinDuration(minDuration)} olmalı.',
+                  : 'Süre en az $minDurationHours saat olmalı.',
               style: figtree(
                 size: 11.5,
                 weight: W.semibold,
@@ -1673,213 +1801,56 @@ class _AppointmentCard extends StatelessWidget {
   }
 }
 
-/// Saatin küçük ekranda hassas seçilmesi zor olan analog kadran yerine,
-/// baş parmakla kaydırılan iki tekerlekli (saat/dakika) alt sayfa.
-Future<TimeOfDay?> _showFriendlyTimePicker(
-  BuildContext context,
-  TimeOfDay initial,
-) {
-  return showModalBottomSheet<TimeOfDay>(
-    context: context,
-    backgroundColor: Colors.transparent,
-    isScrollControlled: true,
-    builder: (context) => _TimePickerSheet(
-      initialHour: initial.hour,
-      initialMinute: initial.minute,
-    ),
-  );
-}
-
-/// Sulama süresini saat + dakika olarak seçmek için — kullanıcı "30 dk"
-/// gibi tam saate yuvarlanmayan bir oturum da açabilsin diye (tek başına
-/// "kaç saat" sayı girişi bunu desteklemiyordu).
-Future<({int hours, int minutes})?> _showDurationPicker(
+Future<int?> _showHourPicker(
   BuildContext context, {
-  required int initialHours,
-  required int initialMinutes,
+  required String title,
+  required int initialHour,
+  required int itemCount,
+  String? unitSuffix,
 }) {
-  return showModalBottomSheet<({int hours, int minutes})>(
+  return showModalBottomSheet<int>(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (context) => _DurationPickerSheet(
-      initialHours: initialHours,
-      initialMinutes: initialMinutes,
+    builder: (context) => _HourPickerSheet(
+      title: title,
+      initialHour: initialHour,
+      itemCount: itemCount,
+      unitSuffix: unitSuffix,
     ),
   );
 }
 
-class _DurationPickerSheet extends StatefulWidget {
-  final int initialHours;
-  final int initialMinutes;
-  const _DurationPickerSheet({
-    required this.initialHours,
-    required this.initialMinutes,
-  });
-
-  @override
-  State<_DurationPickerSheet> createState() => _DurationPickerSheetState();
-}
-
-class _DurationPickerSheetState extends State<_DurationPickerSheet> {
-  static const _maxHours = 99;
-
-  late int _hours = widget.initialHours.clamp(0, _maxHours);
-  late int _minutes = widget.initialMinutes.clamp(0, 59);
-
-  late final FixedExtentScrollController _hoursController;
-  late final FixedExtentScrollController _minutesController;
-
-  @override
-  void initState() {
-    super.initState();
-    _hoursController = FixedExtentScrollController(initialItem: _hours);
-    _minutesController = FixedExtentScrollController(initialItem: _minutes);
-  }
-
-  @override
-  void dispose() {
-    _hoursController.dispose();
-    _minutesController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceBorder,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text('Süre Seç', style: figtree(size: 15, weight: W.extrabold)),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 170,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _TimeWheel(
-                      controller: _hoursController,
-                      itemCount: _maxHours + 1,
-                      labelOf: _twoDigits,
-                      onChanged: (i) => setState(() => _hours = i),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Text(
-                      'sa',
-                      style: figtree(
-                        size: 13,
-                        weight: W.bold,
-                        color: AppColors.inkFaint,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: _TimeWheel(
-                      controller: _minutesController,
-                      itemCount: 60,
-                      labelOf: _twoDigits,
-                      onChanged: (i) => setState(() => _minutes = i),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Text(
-                      'dk',
-                      style: figtree(
-                        size: 13,
-                        weight: W.bold,
-                        color: AppColors.inkFaint,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            PressableScale(
-              scale: .98,
-              onTap: () => Navigator.of(
-                context,
-              ).pop((hours: _hours, minutes: _minutes)),
-              child: Container(
-                height: 50,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: AppColors.nearBlack,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Center(
-                  child: Text(
-                    'Tamam',
-                    style: figtree(
-                      size: 14.5,
-                      weight: W.extrabold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TimePickerSheet extends StatefulWidget {
+class _HourPickerSheet extends StatefulWidget {
+  final String title;
   final int initialHour;
-  final int initialMinute;
-  const _TimePickerSheet({
+  final int itemCount;
+  final String? unitSuffix;
+  const _HourPickerSheet({
+    required this.title,
     required this.initialHour,
-    required this.initialMinute,
+    required this.itemCount,
+    this.unitSuffix,
   });
 
   @override
-  State<_TimePickerSheet> createState() => _TimePickerSheetState();
+  State<_HourPickerSheet> createState() => _HourPickerSheetState();
 }
 
-class _TimePickerSheetState extends State<_TimePickerSheet> {
-  late int _hour = widget.initialHour;
-  late int _minute = widget.initialMinute;
+class _HourPickerSheetState extends State<_HourPickerSheet> {
+  late int _hour = widget.initialHour.clamp(0, widget.itemCount - 1);
 
-  // Tekerlek kaydırıldıkça (onSelectedItemChanged -> setState) bu widget'lar
-  // yeniden build ediliyor; kontrolcü her build'de YENİDEN oluşturulursa
-  // CupertinoPicker'ın kaydırma fiziği kesintiye uğrayıp tekerlek elde
-  // zıplıyor/takılıyordu. Kontrolcüler burada bir kez oluşturulup dispose
-  // edilene kadar aynı kalıyor.
   late final FixedExtentScrollController _hourController;
-  late final FixedExtentScrollController _minuteController;
 
   @override
   void initState() {
     super.initState();
     _hourController = FixedExtentScrollController(initialItem: _hour);
-    _minuteController = FixedExtentScrollController(initialItem: _minute);
   }
 
   @override
   void dispose() {
     _hourController.dispose();
-    _minuteController.dispose();
     super.dispose();
   }
 
@@ -1905,7 +1876,7 @@ class _TimePickerSheetState extends State<_TimePickerSheet> {
               ),
             ),
             const SizedBox(height: 14),
-            Text('Saat Seç', style: figtree(size: 15, weight: W.extrabold)),
+            Text(widget.title, style: figtree(size: 15, weight: W.extrabold)),
             const SizedBox(height: 8),
             SizedBox(
               height: 170,
@@ -1914,36 +1885,30 @@ class _TimePickerSheetState extends State<_TimePickerSheet> {
                   Expanded(
                     child: _TimeWheel(
                       controller: _hourController,
-                      itemCount: 24,
+                      itemCount: widget.itemCount,
                       labelOf: _twoDigits,
                       onChanged: (i) => setState(() => _hour = i),
                     ),
                   ),
-                  Text(
-                    ':',
-                    style: figtree(
-                      size: 22,
-                      weight: W.extrabold,
-                      color: AppColors.inkFaint,
+                  if (widget.unitSuffix != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Text(
+                        widget.unitSuffix!,
+                        style: figtree(
+                          size: 13,
+                          weight: W.bold,
+                          color: AppColors.inkFaint,
+                        ),
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: _TimeWheel(
-                      controller: _minuteController,
-                      itemCount: 60,
-                      labelOf: _twoDigits,
-                      onChanged: (i) => setState(() => _minute = i),
-                    ),
-                  ),
                 ],
               ),
             ),
             const SizedBox(height: 18),
             PressableScale(
               scale: .98,
-              onTap: () => Navigator.of(
-                context,
-              ).pop(TimeOfDay(hour: _hour, minute: _minute)),
+              onTap: () => Navigator.of(context).pop(_hour),
               child: Container(
                 height: 50,
                 width: double.infinity,
@@ -1988,9 +1953,6 @@ class _TimeWheel extends StatelessWidget {
     itemExtent: 40,
     diameterRatio: 1.4,
     onSelectedItemChanged: onChanged,
-    // Not: buraya opak bir `color` konursa listenin ÜSTÜNE bindiği için
-    // ortadaki seçili sayının yazısını tamamen gizler (rakam görünmez
-    // olur) — bu yüzden sadece kenarlık kullanılıyor, dolgu yok.
     selectionOverlay: Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),

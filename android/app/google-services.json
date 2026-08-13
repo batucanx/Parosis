@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "136497821478",
+    "project_id": "parosis-446b6",
+    "storage_bucket": "parosis-446b6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:136497821478:android:b3096f0eafbdebaaeeb3e7",
+        "android_client_info": {
+          "package_name": "com.parosis.sulama"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "136497821478-gmv9abh4nlo2comnvrppiisv2509rbd4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.parosis.sulama",
+            "certificate_hash": "43dea251197544539e564f32ca663382e18c9bbc"
+          }
+        },
+        {
+          "client_id": "136497821478-4g20octoklkr8j9ueqsn39pc1thada1i.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBSh_OiGRm24FoCFOCtPTjqALVCAXu4IJk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "136497821478-4g20octoklkr8j9ueqsn39pc1thada1i.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "136497821478-p5nsthe5hjspjvc5cg3r56b9rok7cm56.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.parosis.sulama"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

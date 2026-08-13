@@ -34,9 +34,6 @@ final _tabs = [
   ),
 ];
 
-/// Ekranın altına bitişik navigasyon çubuğu — sekmeler arası geçişte tek
-/// bir gösterge (pill) kayarak/eni değişerek seçili sekmeye taşınır, ayrı
-/// ayrı her sekmenin kendi arkaplanını boyaması yerine.
 class BottomNav extends StatelessWidget {
   final AppDestination activeDestination;
   final ValueChanged<AppDestination> onChange;
@@ -56,9 +53,6 @@ class BottomNav extends StatelessWidget {
     return GlassNav(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
       padding: const EdgeInsets.all(8),
-      // Arkaplan (yukarıdaki GlassNav) ekranın en altına kadar kesintisiz
-      // sürsün, sadece dokunma alanı ev tuşu çizgisinin üstünde kalsın diye
-      // güvenli alan burada, içerikte uygulanıyor — dışarıda değil.
       child: SafeArea(
         top: false,
         child: LayoutBuilder(

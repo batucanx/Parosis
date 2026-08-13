@@ -1,8 +1,8 @@
+library;
+
 /// Kuyu talebi formundaki Ülke seçimi için ülke listesi. "Türkiye" en üstte
 /// sabitlenir (uygulamanın birincil pazarı), geri kalanı Türkçe alfabetik
 /// sıradadır.
-library;
-
 const List<String> countries = [
   'Türkiye',
   'Afganistan',

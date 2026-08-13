@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
+import 'package:parosis_sulama/core/forms/scroll_to_field.dart';
 import 'package:parosis_sulama/core/permissions/onboarding_permissions.dart';
 import 'package:parosis_sulama/core/validation/auth_validators.dart';
 import 'package:parosis_sulama/features/auth/presentation/controllers/auth_controller.dart';
@@ -32,7 +34,10 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
+  final _emailKey = GlobalKey();
+  final _passwordKey = GlobalKey();
 
   String? _emailError;
   String? _passwordError;
@@ -41,6 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
+    _emailFocus.dispose();
     _passwordFocus.dispose();
     super.dispose();
   }
@@ -52,7 +58,13 @@ class _LoginScreenState extends State<LoginScreen> {
       _emailError = emailError;
       _passwordError = passwordError;
     });
-    if (emailError != null || passwordError != null) return;
+    if (emailError != null || passwordError != null) {
+      await scrollToFirstError([
+        (emailError, _emailKey, _emailFocus),
+        (passwordError, _passwordKey, _passwordFocus),
+      ]);
+      return;
+    }
 
     final success = await widget.controller.login(
       email: _emailCtrl.text,
@@ -63,10 +75,11 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _showGoogleComingSoon() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Google ile giriş yakında aktif olacak.')),
-    );
+  Future<void> _loginWithGoogle() async {
+    final success = await widget.controller.loginWithGoogle();
+    if (success) {
+      unawaited(requestOnboardingPermissions());
+    }
   }
 
   @override
@@ -79,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Hesabınıza Giriş Yapın',
+              'Parosis Sulama Sistemleri',
               textAlign: TextAlign.center,
               style: figtree(
                 size: 20,
@@ -89,7 +102,9 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 22),
             AuthTextField(
+              key: _emailKey,
               controller: _emailCtrl,
+              focusNode: _emailFocus,
               label: 'E-posta Adresi',
               hint: 'you@example.com',
               iconBuilder: (c) => AppIcons.mail(size: 19, color: c),
@@ -101,6 +116,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 16),
             AuthTextField(
+              key: _passwordKey,
               controller: _passwordCtrl,
               focusNode: _passwordFocus,
               label: 'Şifre',
@@ -153,7 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 20),
             AuthOutlineButton(
               label: 'Google ile giriş yap',
-              onTap: _showGoogleComingSoon,
+              onTap: _loginWithGoogle,
               leading: const _GoogleMark(),
             ),
             const SizedBox(height: 12),
@@ -169,18 +185,6 @@ class _GoogleMark extends StatelessWidget {
   const _GoogleMark();
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 20,
-    height: 20,
-    child: Center(
-      child: Text(
-        'G',
-        style: figtree(
-          size: 15,
-          weight: W.extrabold,
-          color: const Color(0xFF4285F4),
-        ),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) =>
+      SvgPicture.asset('assets/icons/google_logo.svg', width: 20, height: 20);
 }

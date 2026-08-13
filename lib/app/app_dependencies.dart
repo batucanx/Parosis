@@ -1,7 +1,9 @@
-import 'package:parosis_sulama/features/auth/data/repositories/mock_auth_repository.dart';
+import 'package:parosis_sulama/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:parosis_sulama/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:parosis_sulama/features/irrigation/data/repositories/mock_irrigation_repository.dart';
 import 'package:parosis_sulama/features/irrigation/presentation/controllers/irrigation_controller.dart';
+import 'package:parosis_sulama/features/notifications/data/repositories/local_notification_preferences_repository.dart';
+import 'package:parosis_sulama/features/notifications/presentation/controllers/notification_preferences_controller.dart';
 import 'package:parosis_sulama/features/payment_cards/data/repositories/mock_payment_cards_repository.dart';
 import 'package:parosis_sulama/features/payment_cards/presentation/controllers/payment_cards_controller.dart';
 import 'package:parosis_sulama/features/profile/data/repositories/mock_profile_repository.dart';
@@ -15,8 +17,6 @@ import 'package:parosis_sulama/features/well_requests/presentation/controllers/w
 import 'package:parosis_sulama/features/wells/data/repositories/mock_well_repository.dart';
 import 'package:parosis_sulama/features/wells/presentation/controllers/wells_controller.dart';
 
-/// Application-wide dependency container and composition root.
-///
 /// [AppDependencies.mock] wires every controller to an in-memory/mock
 /// repository. A future `AppDependencies.remote(...)` factory wires the same
 /// controllers to HTTP-backed repositories once an API contract exists —
@@ -32,15 +32,14 @@ final class AppDependencies {
     required this.paymentCardsController,
     required this.wellRequestsController,
     required this.wellBookingsController,
+    required this.notificationPreferencesController,
   });
 
   factory AppDependencies.mock() {
-    final authController = AuthController(repository: MockAuthRepository());
+    final authController = AuthController(repository: FirebaseAuthRepository());
     // Kuyular paylaşımlı bir havuz (herkes aynı listeyi görür, bkz.
     // mock_well_repository.dart) — currentUserId'ye bağlı değil.
-    final wellsController = WellsController(
-      repository: MockWellRepository(),
-    );
+    final wellsController = WellsController(repository: MockWellRepository());
     final irrigationController = IrrigationController(
       repository: MockIrrigationRepository(
         currentUserId: () => authController.user?.id,
@@ -71,15 +70,21 @@ final class AppDependencies {
         currentUserId: () => authController.user?.id,
       ),
     );
+    final notificationPreferencesController = NotificationPreferencesController(
+      repository: LocalNotificationPreferencesRepository(
+        currentUserId: () => authController.user?.id,
+      ),
+    );
     // Login/kayıt/çıkış sonrası bakiye, aktif/geçmiş sulamalar, profil,
-    // kayıtlı kartlar ve talepler, oturumdaki kullanıcıyla otomatik
-    // güncellenir.
+    // kayıtlı kartlar, talepler ve bildirim tercihleri, oturumdaki
+    // kullanıcıyla otomatik güncellenir.
     authController.addListener(walletController.refresh);
     authController.addListener(irrigationController.refresh);
     authController.addListener(profileController.refresh);
     authController.addListener(paymentCardsController.refresh);
     authController.addListener(wellRequestsController.refresh);
     authController.addListener(wellBookingsController.refresh);
+    authController.addListener(notificationPreferencesController.refresh);
 
     return AppDependencies(
       authController: authController,
@@ -90,6 +95,7 @@ final class AppDependencies {
       paymentCardsController: paymentCardsController,
       wellRequestsController: wellRequestsController,
       wellBookingsController: wellBookingsController,
+      notificationPreferencesController: notificationPreferencesController,
     );
   }
 
@@ -101,6 +107,7 @@ final class AppDependencies {
   final PaymentCardsController paymentCardsController;
   final WellRequestsController wellRequestsController;
   final WellBookingsController wellBookingsController;
+  final NotificationPreferencesController notificationPreferencesController;
 
   void dispose() {
     authController.dispose();
@@ -111,5 +118,6 @@ final class AppDependencies {
     paymentCardsController.dispose();
     wellRequestsController.dispose();
     wellBookingsController.dispose();
+    notificationPreferencesController.dispose();
   }
 }

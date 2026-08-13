@@ -34,9 +34,6 @@ Color _statusBg(WellRequestStatus status) => switch (status) {
   WellRequestStatus.rejected => AppColors.red50,
 };
 
-/// "Talepler" ekranının "Kuyu Talepleri" sekmesi — yeni kuyu talebi
-/// oluşturma + gönderilmiş taleplerin listesi (düzenle/sil, sadece
-/// onay bekleyenler için).
 class WellRequestsTab extends StatelessWidget {
   final WellRequestsController controller;
   const WellRequestsTab({super.key, required this.controller});
@@ -77,14 +74,22 @@ class WellRequestsTab extends StatelessWidget {
             onPressed: () => Navigator.of(dialogContext).pop(false),
             child: Text(
               'Vazgeç',
-              style: figtree(size: 14, weight: W.bold, color: AppColors.inkSoft),
+              style: figtree(
+                size: 14,
+                weight: W.bold,
+                color: AppColors.inkSoft,
+              ),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: Text(
               'Sil',
-              style: figtree(size: 14, weight: W.extrabold, color: AppColors.red600),
+              style: figtree(
+                size: 14,
+                weight: W.extrabold,
+                color: AppColors.red600,
+              ),
             ),
           ),
         ],
@@ -108,7 +113,10 @@ class WellRequestsTab extends StatelessWidget {
             child: PressableScale(
               onTap: () => _openNew(context),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 16,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.brand700,
                   borderRadius: BorderRadius.circular(18),
@@ -307,7 +315,10 @@ class _WellRequestCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: _statusBg(request.status),
                   borderRadius: BorderRadius.circular(999),

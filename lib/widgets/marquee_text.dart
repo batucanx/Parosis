@@ -2,11 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// Tek satırlık metin kullanılabilir alana sığmadığında tamamını otomatik gösterir.
-///
-/// Kısa metinler sabit kalır. Uzun metinler başlangıçta bekler, sonuna kadar
-/// kayar, tekrar bekler ve yumuşakça başa döner. Sistem animasyonları kapalıysa
-/// hareket uygulanmaz; tam metin ekran okuyucuya tek parça olarak sunulur.
 class MarqueeText extends StatelessWidget {
   static const double _glyphEdgePadding = 4;
 
@@ -49,10 +44,6 @@ class MarqueeText extends StatelessWidget {
           );
         }
 
-        // Font metriklerinden kaynaklanan birkac piksellik tasma, kullaniciya
-        // gercek bir tasma gibi gorunmez. Bu sinirdaki metni cok hafif
-        // kuculterek tamamen okunur tut; bir sonraki harf siniri astiginda
-        // otomatik kaymayi baslat.
         if (measuredOverflow <= overflowTolerance) {
           return SizedBox(
             width: availableWidth,

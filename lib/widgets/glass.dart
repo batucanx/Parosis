@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../theme/colors.dart';
 
-/// Ana buzlu yüzey. Kartlar için yükseltilmiş, alan ve seçim kontrolleri için
-/// daha sakin bir görünüm sunar.
 class GlassPanel extends StatelessWidget {
   final Widget child;
   final BorderRadius borderRadius;
@@ -56,7 +54,6 @@ class GlassPanel extends StatelessWidget {
   }
 }
 
-/// Küçük yardımcı yüzeyler için daha az derinlikli cam.
 class GlassSoft extends StatelessWidget {
   final Widget child;
   final BorderRadius borderRadius;
@@ -90,7 +87,6 @@ class GlassSoft extends StatelessWidget {
   }
 }
 
-/// Yüzen alt navigasyon için daha geçirgen ve derin cam yüzeyi.
 class GlassNav extends StatelessWidget {
   final Widget child;
   final BorderRadius borderRadius;

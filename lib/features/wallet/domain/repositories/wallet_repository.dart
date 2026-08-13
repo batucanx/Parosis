@@ -5,6 +5,5 @@ abstract interface class WalletRepository {
   Future<Result<int>> getBalance();
   Future<Result<List<StatementRow>>> getStatement();
 
-  /// Credits [amount] TL to the balance and returns the resulting balance.
   Future<Result<int>> topUp(int amount);
 }

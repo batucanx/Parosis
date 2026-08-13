@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'colors.dart';
 
-/// Tailwind'in `tracking-*` ölçeği (em, fontSize ile çarpılır).
 class Tracking {
   Tracking._();
   static const tighter = -0.05;
@@ -12,8 +11,6 @@ class Tracking {
   static const widest = 0.1;
 }
 
-/// Figtree tabanlı, Tailwind'in `text-[Npx] font-* tracking-*` kalıbının
-/// birebir karşılığı olan yardımcı fonksiyon.
 TextStyle figtree({
   required double size,
   required FontWeight weight,
@@ -31,7 +28,6 @@ TextStyle figtree({
   );
 }
 
-/// font-weight isimleri — Tailwind: medium=500, semibold=600, bold=700, extrabold=800
 class W {
   W._();
   static const medium = FontWeight.w500;

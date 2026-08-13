@@ -4,10 +4,6 @@ import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 import 'pressable_scale.dart';
 
-/// Geri alınamaz/hassas eylemlerden önce (talep iptali, sulama durdurma,
-/// çıkış yapma vb.) kullanıcıya "emin misiniz?" diye soran, tüm uygulamada
-/// aynı görünüme sahip onay diyaloğu. `showDialog<bool>` ile açılır — true
-/// dönerse eylem onaylanmış demektir.
 class ConfirmDialog extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -121,7 +117,6 @@ class ConfirmDialog extends StatelessWidget {
   );
 }
 
-/// [ConfirmDialog]'u açıp kullanıcının onayını bekler; onaylarsa true döner.
 Future<bool> showConfirmDialog(
   BuildContext context, {
   required IconData icon,

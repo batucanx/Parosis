@@ -7,7 +7,6 @@ import 'package:parosis_sulama/theme/colors.dart';
 import 'package:parosis_sulama/theme/text_styles.dart';
 import 'package:parosis_sulama/widgets/glass.dart';
 
-/// Referanstaki dört net kolonu, küçük ekranlarda da hizalı tutar.
 class StatementLayoutHead extends StatelessWidget {
   const StatementLayoutHead({super.key});
   @override

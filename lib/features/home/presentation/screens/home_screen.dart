@@ -573,7 +573,11 @@ class _ActiveIrrigationCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(
                     'Durduruluyor…',
-                    style: figtree(size: 13, weight: W.bold, color: Colors.white),
+                    style: figtree(
+                      size: 13,
+                      weight: W.bold,
+                      color: Colors.white,
+                    ),
                   ),
                 ],
               ),

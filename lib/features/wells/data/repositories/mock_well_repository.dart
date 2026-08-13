@@ -18,7 +18,8 @@ final class MockWellRepository implements WellRepository {
   static const List<Well> _wells = [
     Well(
       id: 'k1',
-      name: 'Ali Yurtseven Taşlı Tarla',
+      name: 'Taşlı Tarla',
+      ownerName: 'Ali Yurtseven',
       province: 'Burdur',
       district: 'Tefenni',
       components: [
@@ -30,22 +31,21 @@ final class MockWellRepository implements WellRepository {
     ),
     Well(
       id: 'k2',
-      name: 'Alihsan Özçoban Karapınar',
+      name: 'Karapınar',
+      ownerName: 'Alihsan Özçoban',
       province: 'Burdur',
       district: 'Tefenni',
       components: [
         WellComponent(type: WellComponentType.pump, status: _online),
         WellComponent(type: WellComponentType.thermal, status: _offline),
         WellComponent(type: WellComponentType.power, status: _offline),
-        WellComponent(
-          type: WellComponentType.communication,
-          status: _offline,
-        ),
+        WellComponent(type: WellComponentType.communication, status: _offline),
       ],
     ),
     Well(
       id: 'k3',
-      name: 'Alihsan Özçoban Taşlı Tarla',
+      name: 'Taşlı Tarla',
+      ownerName: 'Alihsan Özçoban',
       province: 'Burdur',
       district: 'Tefenni',
       components: [
@@ -57,7 +57,8 @@ final class MockWellRepository implements WellRepository {
     ),
     Well(
       id: 'k4',
-      name: 'Emin Avcıkol Bozdağ',
+      name: 'Bozdağ',
+      ownerName: 'Emin Avcıkol',
       province: 'Burdur',
       district: 'Tefenni',
       components: [
@@ -69,7 +70,8 @@ final class MockWellRepository implements WellRepository {
     ),
     Well(
       id: 'k5',
-      name: 'GY İnşaat Mermer Ocağı Kuyusu',
+      name: 'Mermer Ocağı Kuyusu',
+      ownerName: 'GY İnşaat',
       province: 'Denizli',
       district: 'Acıpayam',
       components: [
@@ -81,7 +83,8 @@ final class MockWellRepository implements WellRepository {
     ),
     Well(
       id: 'k6',
-      name: 'İsmet Serttaş Bozdağın Dibi',
+      name: 'Bozdağın Dibi',
+      ownerName: 'İsmet Serttaş',
       province: 'Burdur',
       district: 'Tefenni',
       components: [
@@ -93,7 +96,8 @@ final class MockWellRepository implements WellRepository {
     ),
     Well(
       id: 'k7',
-      name: 'Rahmi Ekinci Harım Yeni Sondaj',
+      name: 'Harım Yeni Sondaj',
+      ownerName: 'Rahmi Ekinci',
       province: 'Burdur',
       district: 'Tefenni',
       components: [

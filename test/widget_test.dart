@@ -7,8 +7,6 @@ import 'package:parosis_sulama/app/app_dependencies.dart';
 import 'package:parosis_sulama/app/app_root.dart';
 import 'package:parosis_sulama/widgets/marquee_text.dart';
 
-/// Demo hesabıyla giriş yapılmış bir composition root döner — Home akışını
-/// doğrulayan testler login ekranını atlayıp doğrudan `AppRoot`'u görür.
 Future<AppDependencies> _signedInDependencies() async {
   final dependencies = AppDependencies.mock();
   final signedIn = await dependencies.authController.login(

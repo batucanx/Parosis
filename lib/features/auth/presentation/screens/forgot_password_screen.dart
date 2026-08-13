@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:parosis_sulama/core/forms/scroll_to_field.dart';
 import 'package:parosis_sulama/core/validation/auth_validators.dart';
 import 'package:parosis_sulama/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:parosis_sulama/features/auth/presentation/widgets/auth_buttons.dart';
@@ -26,19 +27,25 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailCtrl = TextEditingController();
+  final _emailFocus = FocusNode();
+  final _emailKey = GlobalKey();
   String? _emailError;
   bool _sent = false;
 
   @override
   void dispose() {
     _emailCtrl.dispose();
+    _emailFocus.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     final emailError = validateEmail(_emailCtrl.text);
     setState(() => _emailError = emailError);
-    if (emailError != null) return;
+    if (emailError != null) {
+      await scrollToFirstError([(emailError, _emailKey, _emailFocus)]);
+      return;
+    }
 
     final success = await widget.controller.sendPasswordResetLink(
       email: _emailCtrl.text,
@@ -49,8 +56,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: widget.controller,
-    builder: (context, _) =>
-        AuthScaffold(child: _sent ? _buildSuccess() : _buildForm(widget.controller)),
+    builder: (context, _) => AuthScaffold(
+      onBack: widget.onBackToLogin,
+      child: _sent ? _buildSuccess() : _buildForm(widget.controller),
+    ),
   );
 
   Widget _buildForm(AuthController controller) => Column(
@@ -74,7 +83,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       ),
       const SizedBox(height: 22),
       AuthTextField(
+        key: _emailKey,
         controller: _emailCtrl,
+        focusNode: _emailFocus,
         label: 'E-posta Adresi',
         hint: 'ornek@email.com',
         iconBuilder: (c) => AppIcons.mail(size: 19, color: c),
@@ -89,7 +100,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         Text(
           controller.error!,
           textAlign: TextAlign.center,
-          style: figtree(size: 12.5, weight: W.semibold, color: AppColors.red600),
+          style: figtree(
+            size: 12.5,
+            weight: W.semibold,
+            color: AppColors.red600,
+          ),
         ),
       ],
       const SizedBox(height: 20),
@@ -163,7 +178,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         style: figtree(size: 12.5, weight: W.medium, color: AppColors.inkSoft),
       ),
       const SizedBox(height: 22),
-      AuthPrimaryButton(label: 'Giriş Ekranına Dön', onTap: widget.onBackToLogin),
+      AuthPrimaryButton(
+        label: 'Giriş Ekranına Dön',
+        onTap: widget.onBackToLogin,
+      ),
     ],
   );
 }

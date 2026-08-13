@@ -1,4 +1,3 @@
-/// Every screen that can be selected by the application shell.
 enum AppDestination {
   home,
   program,
@@ -7,21 +6,24 @@ enum AppDestination {
   topUp,
   profile,
   wellEdit,
-  requests,
+  wellRequests,
+  bookingRequests,
   pastIrrigations,
-  pastIrrigationDetail;
+  pastIrrigationDetail,
+  addressInfo;
 
-  /// The primary navigation destination represented by this screen.
   AppDestination get primaryDestination => switch (this) {
     AppDestination.home ||
     AppDestination.program ||
     AppDestination.instant ||
     AppDestination.wellEdit ||
-    AppDestination.requests ||
+    AppDestination.wellRequests ||
+    AppDestination.bookingRequests ||
     AppDestination.pastIrrigations ||
     AppDestination.pastIrrigationDetail => AppDestination.home,
     AppDestination.balance || AppDestination.topUp => AppDestination.balance,
-    AppDestination.profile => AppDestination.profile,
+    AppDestination.profile ||
+    AppDestination.addressInfo => AppDestination.profile,
   };
 
   bool get isPrimary => switch (this) {
@@ -32,8 +34,10 @@ enum AppDestination {
     AppDestination.instant ||
     AppDestination.topUp ||
     AppDestination.wellEdit ||
-    AppDestination.requests ||
+    AppDestination.wellRequests ||
+    AppDestination.bookingRequests ||
     AppDestination.pastIrrigations ||
-    AppDestination.pastIrrigationDetail => false,
+    AppDestination.pastIrrigationDetail ||
+    AppDestination.addressInfo => false,
   };
 }

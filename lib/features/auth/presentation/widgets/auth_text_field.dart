@@ -6,8 +6,6 @@ import 'package:parosis_sulama/theme/colors.dart';
 import 'package:parosis_sulama/theme/text_styles.dart';
 import 'package:parosis_sulama/widgets/pressable_scale.dart';
 
-/// Login/kayıt formlarındaki tüm alanlarda kullanılan tek metin alanı:
-/// soldan ikon, sağdan (şifre alanlarında) göster/gizle, altta hata metni.
 class AuthTextField extends StatefulWidget {
   const AuthTextField({
     super.key,
@@ -57,7 +55,11 @@ class _AuthTextFieldState extends State<AuthTextField> {
       children: [
         Text(
           widget.label,
-          style: figtree(size: 13, weight: W.semibold, color: AppColors.inkSoft),
+          style: figtree(
+            size: 13,
+            weight: W.semibold,
+            color: AppColors.inkSoft,
+          ),
         ),
         const SizedBox(height: 8),
         Container(
@@ -111,11 +113,10 @@ class _AuthTextFieldState extends State<AuthTextField> {
                   onTap: () => setState(() => _obscured = !_obscured),
                   child: Padding(
                     padding: const EdgeInsets.all(10),
-                    child:
-                        (_obscured ? AppIcons.eyeOff : AppIcons.eye)(
-                          size: 19,
-                          color: AppColors.inkFaint,
-                        ),
+                    child: (_obscured ? AppIcons.eyeOff : AppIcons.eye)(
+                      size: 19,
+                      color: AppColors.inkFaint,
+                    ),
                   ),
                 )
               else
@@ -123,14 +124,6 @@ class _AuthTextFieldState extends State<AuthTextField> {
             ],
           ),
         ),
-        if (hasError)
-          Padding(
-            padding: const EdgeInsets.only(top: 6, left: 2),
-            child: Text(
-              widget.errorText!,
-              style: figtree(size: 11.5, weight: W.medium, color: AppColors.red600),
-            ),
-          ),
       ],
     );
   }

@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 
-/// index.css `sheetUp`/`slideUp` — navbar alanından yukarı kayarak gelen
-/// tam ekran bottom sheet. ProfileInfoSheet ve CardsModal bunu paylaşır.
 class OverlaySheet extends StatelessWidget {
   final String title;
   final VoidCallback onClose;

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Tailwind'in `active:scale-*` + `transition-transform` kalıbının karşılığı.
-/// Dokunulduğunda hafifçe küçülür, bırakınca geri döner.
 class PressableScale extends StatefulWidget {
   final Widget child;
   final VoidCallback? onTap;

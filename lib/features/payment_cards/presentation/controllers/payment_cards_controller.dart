@@ -22,7 +22,6 @@ final class PaymentCardsController extends ChangeNotifier {
   bool get isSubmitting => _isSubmitting;
   Object? get error => _error;
 
-  /// Primary card first, otherwise insertion order.
   List<SavedCard> get displayCards => [
     ..._cards.where((c) => c.isPrimary),
     ..._cards.where((c) => !c.isPrimary),

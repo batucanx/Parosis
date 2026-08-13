@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-/// Icons.jsx'teki line-art SVG ikon setinin birebir Flutter karşılığı.
-/// Her ikon 24x24 viewBox, stroke tabanlı — path verileri React'tekiyle aynı.
 class AppIcons {
   AppIcons._();
 
@@ -420,6 +418,43 @@ class AppIcons {
     '<path d="M9 4.4H6.4A2 2 0 0 0 4.4 6.4v11.2a2 2 0 0 0 2 2H9" />'
     '<path d="M16 15.6 20 12l-4-3.6" />'
     '<path d="M20 12H9.6" />',
+    size: size,
+    color: color,
+    strokeWidth: strokeWidth,
+  );
+
+  static Widget bell({
+    double size = 24,
+    Color color = Colors.black,
+    double strokeWidth = 1.8,
+  }) => _svg(
+    '<path d="M6 8.4a6 6 0 0 1 12 0c0 4.2 1.6 5.6 1.6 5.6H4.4S6 12.6 6 8.4Z" />'
+    '<path d="M10.2 18.4a1.8 1.8 0 0 0 3.6 0" />',
+    size: size,
+    color: color,
+    strokeWidth: strokeWidth,
+  );
+
+  static Widget shield({
+    double size = 24,
+    Color color = Colors.black,
+    double strokeWidth = 1.8,
+  }) => _svg(
+    '<path d="M12 3.4 5 5.8v5.6c0 4.8 3 7.9 7 8.8 4-.9 7-4 7-8.8V5.8L12 3.4Z" />'
+    '<path d="m9.2 12 2 2 3.6-4" />',
+    size: size,
+    color: color,
+    strokeWidth: strokeWidth,
+  );
+
+  static Widget helpCircle({
+    double size = 24,
+    Color color = Colors.black,
+    double strokeWidth = 1.8,
+  }) => _svg(
+    '<circle cx="12" cy="12" r="8.6" />'
+    '<path d="M9.6 9.4a2.4 2.4 0 1 1 3.4 2.2c-.8.4-1 .9-1 1.6" />'
+    '<path d="M12 17.2h.01" />',
     size: size,
     color: color,
     strokeWidth: strokeWidth,

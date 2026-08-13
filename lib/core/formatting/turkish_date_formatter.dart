@@ -28,14 +28,11 @@ const List<String> _turkishShortMonthNames = [
   'Ara',
 ];
 
-/// e.g. "2 Ağustos".
 String formatTurkishDate(DateTime date) =>
     '${date.day} ${turkishMonthNames[date.month - 1]}';
 
-/// e.g. "2 Ağu" — used where horizontal space is tight.
 String formatTurkishShortDate(DateTime date) =>
     '${date.day} ${_turkishShortMonthNames[date.month - 1]}';
 
-/// e.g. "06:30".
 String formatClock(DateTime date) =>
     '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';

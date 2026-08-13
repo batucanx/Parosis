@@ -49,7 +49,6 @@ final class WalletController extends ChangeNotifier {
 
   Future<void> refresh() => _load();
 
-  /// Returns whether the top-up succeeded.
   Future<bool> topUp(int amount) async {
     if (_isSubmitting || amount <= 0) return false;
     _isSubmitting = true;

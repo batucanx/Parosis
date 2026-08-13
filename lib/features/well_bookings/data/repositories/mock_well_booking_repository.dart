@@ -83,19 +83,16 @@ final class MockWellBookingRepository implements WellBookingRepository {
     'status': r.status.name,
   };
 
-  WellBookingRequest _fromJson(Map<String, dynamic> json) =>
-      WellBookingRequest(
-        id: json['id'] as String,
-        wellId: json['wellId'] as String,
-        wellName: json['wellName'] as String,
-        counterpartName: json['counterpartName'] as String,
-        start: DateTime.parse(json['start'] as String),
-        end: DateTime.parse(json['end'] as String),
-        direction: WellBookingDirection.values.byName(
-          json['direction'] as String,
-        ),
-        status: WellBookingStatus.values.byName(json['status'] as String),
-      );
+  WellBookingRequest _fromJson(Map<String, dynamic> json) => WellBookingRequest(
+    id: json['id'] as String,
+    wellId: json['wellId'] as String,
+    wellName: json['wellName'] as String,
+    counterpartName: json['counterpartName'] as String,
+    start: DateTime.parse(json['start'] as String),
+    end: DateTime.parse(json['end'] as String),
+    direction: WellBookingDirection.values.byName(json['direction'] as String),
+    status: WellBookingStatus.values.byName(json['status'] as String),
+  );
 
   String _prefsKeyFor(String userId) => '$_prefsKeyPrefix$userId';
 
@@ -188,7 +185,8 @@ final class MockWellBookingRepository implements WellBookingRepository {
     required String wellId,
     required DateTime day,
   }) {
-    final seed = wellId.hashCode ^ (day.year * 10000 + day.month * 100 + day.day);
+    final seed =
+        wellId.hashCode ^ (day.year * 10000 + day.month * 100 + day.day);
     final rng = Random(seed);
     final entries = <WellScheduleEntry>[];
 
@@ -197,7 +195,13 @@ final class MockWellBookingRepository implements WellBookingRepository {
       final startHour = rng.nextInt(21);
       final startMinute = rng.nextBool() ? 0 : 30;
       final durationMinutes = 30 + rng.nextInt(4) * 15;
-      final start = DateTime(day.year, day.month, day.day, startHour, startMinute);
+      final start = DateTime(
+        day.year,
+        day.month,
+        day.day,
+        startHour,
+        startMinute,
+      );
       final end = start.add(Duration(minutes: durationMinutes));
       if (end.day != start.day) continue;
       entries.add(
@@ -217,9 +221,7 @@ final class MockWellBookingRepository implements WellBookingRepository {
     final isToday =
         day.year == now.year && day.month == now.month && day.day == now.day;
     if (isToday && rng.nextDouble() < 0.5) {
-      final activeStart = now.subtract(
-        Duration(minutes: 20 + rng.nextInt(90)),
-      );
+      final activeStart = now.subtract(Duration(minutes: 20 + rng.nextInt(90)));
       entries.add(
         WellScheduleEntry(
           id: 'synthetic-active-$wellId',

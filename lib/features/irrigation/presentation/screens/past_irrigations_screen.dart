@@ -13,7 +13,10 @@ import 'package:parosis_sulama/widgets/page_heading.dart';
 import 'package:parosis_sulama/widgets/pressable_scale.dart';
 
 String _twoDigits(int n) => n.toString().padLeft(2, '0');
-String _formatDayMonth(DateTime dt) => '${_twoDigits(dt.day)}.${_twoDigits(dt.month)}';
+String _formatDayMonth(DateTime dt) =>
+    '${_twoDigits(dt.day)}.${_twoDigits(dt.month)}';
+String _formatTime(DateTime dt) =>
+    '${_twoDigits(dt.hour)}:${_twoDigits(dt.minute)}';
 
 const _weekdayLabels = ['PZT', 'SAL', 'ÇAR', 'PER', 'CUM', 'CMT', 'PAZ'];
 String _weekdayLabel(DateTime dt) => _weekdayLabels[dt.weekday - 1];
@@ -29,8 +32,6 @@ String _formatDuration(Duration d) {
   return '$h sa $m dk';
 }
 
-/// Bir kuyunun bir günündeki tüm oturumlarının gruplanmış hâli — "Günlük
-/// Toplam Kullanım" grafiği ve "Detayı göster" listesi bu birimi kullanır.
 class _DayGroup {
   final DateTime date;
   final List<PastIrrigation> sessions;
@@ -39,10 +40,13 @@ class _DayGroup {
   Duration get totalDuration =>
       sessions.fold(Duration.zero, (sum, s) => sum + s.duration);
 
-  Map<String, Duration> get byPerson {
-    final map = <String, Duration>{};
+  Map<String, List<PastIrrigation>> get sessionsByPerson {
+    final map = <String, List<PastIrrigation>>{};
     for (final s in sessions) {
-      map[s.personName] = (map[s.personName] ?? Duration.zero) + s.duration;
+      (map[s.personName] ??= []).add(s);
+    }
+    for (final list in map.values) {
+      list.sort((a, b) => a.occurredAt.compareTo(b.occurredAt));
     }
     return map;
   }
@@ -58,10 +62,9 @@ List<_DayGroup> _groupByDay(List<PastIrrigation> sessions) {
     );
     (map[day] ??= []).add(s);
   }
-  final days = map.entries
-      .map((e) => _DayGroup(date: e.key, sessions: e.value))
-      .toList()
-    ..sort((a, b) => a.date.compareTo(b.date));
+  final days =
+      map.entries.map((e) => _DayGroup(date: e.key, sessions: e.value)).toList()
+        ..sort((a, b) => a.date.compareTo(b.date));
   return days;
 }
 
@@ -80,8 +83,6 @@ class _CenteredNotice extends StatelessWidget {
   );
 }
 
-/// Hamburger menüden açılan "Geçmiş Sulamalar" akışının ilk adımı — kuyu
-/// seçilince [onSelectWell] ile detay ekranına geçilir.
 class PastIrrigationsScreen extends StatefulWidget {
   final WellsController wellsController;
   final IrrigationController irrigationController;
@@ -187,7 +188,10 @@ class _PastIrrigationsScreenState extends State<PastIrrigationsScreen> {
             )
           else
             for (final well in results) ...[
-              _HistoryWellCard(well: well, onTap: () => widget.onSelectWell(well)),
+              _HistoryWellCard(
+                well: well,
+                onTap: () => widget.onSelectWell(well),
+              ),
               const SizedBox(height: 12),
             ],
         ],
@@ -265,8 +269,6 @@ class _HistoryWellCard extends StatelessWidget {
   );
 }
 
-/// Seçilen kuyunun tüm geçmiş sulama dökümü — GÜN/TOPLAM KULLANIM özeti,
-/// günlük kullanım grafiği ve açılır/kapanır kişi bazlı detay listesi.
 /// Geri navigasyonu ortak AppHeader yönettiği için ayrı bir "kuyu değiştir"
 /// butonu yok.
 class PastIrrigationDetailScreen extends StatefulWidget {
@@ -300,6 +302,44 @@ class _PastIrrigationDetailScreenState
       _detailExpanded = true;
       _highlightedDay = day;
     });
+  }
+
+  Future<void> _pickDate(List<_DayGroup> days) async {
+    if (days.isEmpty) return;
+    final firstDate = days.first.date;
+    final lastDate = days.last.date;
+    final initialDate =
+        _highlightedDay != null &&
+            !_highlightedDay!.isBefore(firstDate) &&
+            !_highlightedDay!.isAfter(lastDate)
+        ? _highlightedDay!
+        : lastDate;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+    );
+    if (picked == null || !mounted) return;
+
+    final match = days.where((d) => _isSameDay(d.date, picked)).firstOrNull;
+    if (match == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${_formatDayMonth(picked)} tarihinde sulama kaydı yok.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _detailExpanded = true;
+      _highlightedDay = match.date;
+    });
+    await _showDayDetailSheet(context, match);
   }
 
   @override
@@ -363,7 +403,9 @@ class _PastIrrigationDetailScreenState
             else ...[
               Row(
                 children: [
-                  Expanded(child: _StatTile(label: 'GÜN', value: '${days.length}')),
+                  Expanded(
+                    child: _StatTile(label: 'GÜN', value: '${days.length}'),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: _StatTile(
@@ -381,23 +423,45 @@ class _PastIrrigationDetailScreenState
                 onBarTap: _onBarTap,
               ),
               const SizedBox(height: 14),
-              _DetailToggle(
+              _FilterActionsRow(
                 expanded: _detailExpanded,
-                onTap: () => setState(() => _detailExpanded = !_detailExpanded),
+                onDateTap: () => _pickDate(days),
+                onToggleTap: () =>
+                    setState(() => _detailExpanded = !_detailExpanded),
               ),
-              if (_detailExpanded) ...[
-                const SizedBox(height: 12),
-                for (final day in days.reversed) ...[
-                  _DayDetailCard(
-                    key: ValueKey(day.date),
-                    day: day,
-                    highlighted:
-                        _highlightedDay != null &&
-                        _isSameDay(day.date, _highlightedDay!),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 280),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SizeTransition(
+                    sizeFactor: animation,
+                    axisAlignment: -1,
+                    child: child,
                   ),
-                  const SizedBox(height: 10),
-                ],
-              ],
+                ),
+                child: _detailExpanded
+                    ? Column(
+                        key: const ValueKey('day-detail-list'),
+                        children: [
+                          const SizedBox(height: 12),
+                          for (final day in days.reversed) ...[
+                            _DayDetailCard(
+                              key: ValueKey(day.date),
+                              day: day,
+                              highlighted:
+                                  _highlightedDay != null &&
+                                  _isSameDay(day.date, _highlightedDay!),
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                        ],
+                      )
+                    : const SizedBox.shrink(
+                        key: ValueKey('day-detail-list-empty'),
+                      ),
+              ),
             ],
           ],
         );
@@ -432,7 +496,11 @@ class _StatTile extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           value,
-          style: figtree(size: 20, weight: W.extrabold, color: valueColor ?? AppColors.ink),
+          style: figtree(
+            size: 20,
+            weight: W.extrabold,
+            color: valueColor ?? AppColors.ink,
+          ),
         ),
       ],
     ),
@@ -450,7 +518,22 @@ class _DailyUsageChart extends StatelessWidget {
   });
 
   static const _chartHeight = 140.0;
-  static const _axisSteps = [1, 2, 3, 6, 12, 18, 24, 36, 48, 72, 96, 120, 168, 240];
+  static const _axisSteps = [
+    1,
+    2,
+    3,
+    6,
+    12,
+    18,
+    24,
+    36,
+    48,
+    72,
+    96,
+    120,
+    168,
+    240,
+  ];
 
   double _niceAxisMax(double maxHours) {
     if (maxHours <= 0) return 1;
@@ -527,7 +610,10 @@ class _DailyUsageChart extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('${axisMax.toInt()} sa', style: axisLabelStyle),
-                      Text('${(axisMax / 2).toInt()} sa', style: axisLabelStyle),
+                      Text(
+                        '${(axisMax / 2).toInt()} sa',
+                        style: axisLabelStyle,
+                      ),
                       Text('0', style: axisLabelStyle),
                     ],
                   ),
@@ -573,10 +659,18 @@ class _DailyUsageChart extends StatelessWidget {
                           textAlign: TextAlign.center,
                           style: figtree(
                             size: 9.5,
-                            weight: _isSameDay(day.date, selectedDay ?? DateTime(1970))
+                            weight:
+                                _isSameDay(
+                                  day.date,
+                                  selectedDay ?? DateTime(1970),
+                                )
                                 ? W.extrabold
                                 : W.semibold,
-                            color: _isSameDay(day.date, selectedDay ?? DateTime(1970))
+                            color:
+                                _isSameDay(
+                                  day.date,
+                                  selectedDay ?? DateTime(1970),
+                                )
                                 ? AppColors.brand700
                                 : AppColors.inkFaint,
                           ),
@@ -623,6 +717,63 @@ class _DayBar extends StatelessWidget {
   );
 }
 
+class _FilterActionsRow extends StatelessWidget {
+  final bool expanded;
+  final VoidCallback onDateTap;
+  final VoidCallback onToggleTap;
+  const _FilterActionsRow({
+    required this.expanded,
+    required this.onDateTap,
+    required this.onToggleTap,
+  });
+
+  static const _duration = Duration(milliseconds: 320);
+  static const _curve = Curves.easeOutCubic;
+  static const _toggleWidth = 158.0;
+  static const _gap = 10.0;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 46,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final totalWidth = constraints.maxWidth;
+        final toggleWidth = _toggleWidth.clamp(0.0, totalWidth);
+        final reserved = (toggleWidth + _gap).clamp(0.0, totalWidth);
+        return Stack(
+          children: [
+            AnimatedPositioned(
+              duration: _duration,
+              curve: _curve,
+              top: 0,
+              bottom: 0,
+              left: 0,
+              right: expanded ? reserved : totalWidth,
+              child: ClipRect(
+                child: AnimatedOpacity(
+                  duration: _duration,
+                  curve: _curve,
+                  opacity: expanded ? 1 : 0,
+                  child: _DateFilterButton(onTap: onDateTap),
+                ),
+              ),
+            ),
+            AnimatedPositioned(
+              duration: _duration,
+              curve: _curve,
+              top: 0,
+              bottom: 0,
+              left: expanded ? totalWidth - toggleWidth : 0,
+              right: 0,
+              child: _DetailToggle(expanded: expanded, onTap: onToggleTap),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
 class _DetailToggle extends StatelessWidget {
   final bool expanded;
   final VoidCallback onTap;
@@ -660,14 +811,66 @@ class _DetailToggle extends StatelessWidget {
   );
 }
 
+class _DateFilterButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _DateFilterButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => PressableScale(
+    scale: .98,
+    onTap: onTap,
+    child: Container(
+      height: 46,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.surfaceBorder),
+      ),
+      child: ClipRect(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.calendar_today_rounded,
+              size: 15,
+              color: AppColors.inkSoft,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Tarih Filtrele',
+              style: figtree(
+                size: 13,
+                weight: W.bold,
+                color: AppColors.inkSoft,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Future<void> _showDayDetailSheet(BuildContext context, _DayGroup day) {
+  return showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (context) => _DayDetailSheet(day: day),
+  );
+}
+
 class _DayDetailCard extends StatelessWidget {
   final _DayGroup day;
   final bool highlighted;
-  const _DayDetailCard({super.key, required this.day, required this.highlighted});
+  const _DayDetailCard({
+    super.key,
+    required this.day,
+    required this.highlighted,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final byPerson = day.byPerson;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       decoration: BoxDecoration(
@@ -677,16 +880,17 @@ class _DayDetailCard extends StatelessWidget {
           width: 1.4,
         ),
       ),
-      child: GlassPanel(
-        borderRadius: BorderRadius.circular(16),
-        elevated: false,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 46,
-              child: Column(
+      child: PressableScale(
+        scale: .98,
+        onTap: () => _showDayDetailSheet(context, day),
+        child: GlassPanel(
+          borderRadius: BorderRadius.circular(16),
+          elevated: false,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -705,55 +909,142 @@ class _DayDetailCard extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              const Spacer(),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final entry in byPerson.entries)
-                        _PersonBadge(name: entry.key, duration: entry.value),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
                   Text(
-                    '${day.sessions.length} oturum',
+                    'TOPLAM',
                     style: figtree(
-                      size: 11,
-                      weight: W.medium,
+                      size: 9.5,
+                      weight: W.extrabold,
                       color: AppColors.inkFaint,
+                      tracking: Tracking.wide,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _formatDuration(day.totalDuration),
+                    style: figtree(
+                      size: 13.5,
+                      weight: W.extrabold,
+                      color: AppColors.brand600,
                     ),
                   ),
                 ],
               ),
+              const SizedBox(width: 10),
+              AppIcons.chevronRight(size: 14, color: AppColors.inkFaint),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DayDetailSheet extends StatelessWidget {
+  final _DayGroup day;
+  const _DayDetailSheet({required this.day});
+
+  @override
+  Widget build(BuildContext context) {
+    final byPerson = day.sessionsByPerson;
+    final people = byPerson.keys.toList()
+      ..sort((a, b) {
+        Duration totalOf(String name) =>
+            byPerson[name]!.fold(Duration.zero, (sum, s) => sum + s.duration);
+        return totalOf(b).compareTo(totalOf(a));
+      });
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceBorder,
+                borderRadius: BorderRadius.circular(999),
+              ),
             ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  'TOPLAM',
-                  style: figtree(
-                    size: 9.5,
-                    weight: W.extrabold,
-                    color: AppColors.inkFaint,
-                    tracking: Tracking.wide,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${_weekdayLabel(day.date)} ${_formatDayMonth(day.date)}',
+                          style: figtree(size: 16, weight: W.extrabold),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${day.sessions.length} oturum',
+                          style: figtree(
+                            size: 12,
+                            weight: W.medium,
+                            color: AppColors.inkSoft,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _formatDuration(day.totalDuration),
-                  style: figtree(
-                    size: 13.5,
-                    weight: W.extrabold,
-                    color: AppColors.brand600,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'TOPLAM',
+                        style: figtree(
+                          size: 9.5,
+                          weight: W.extrabold,
+                          color: AppColors.inkFaint,
+                          tracking: Tracking.wide,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _formatDuration(day.totalDuration),
+                        style: figtree(
+                          size: 15,
+                          weight: W.extrabold,
+                          color: AppColors.brand600,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                children: [
+                  for (final person in people) ...[
+                    _PersonSessionGroup(
+                      name: person,
+                      sessions: byPerson[person]!,
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                ],
+              ),
             ),
           ],
         ),
@@ -762,21 +1053,78 @@ class _DayDetailCard extends StatelessWidget {
   }
 }
 
-class _PersonBadge extends StatelessWidget {
+class _PersonSessionGroup extends StatelessWidget {
   final String name;
-  final Duration duration;
-  const _PersonBadge({required this.name, required this.duration});
+  final List<PastIrrigation> sessions;
+  const _PersonSessionGroup({required this.name, required this.sessions});
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(
-      color: AppColors.slate100,
-      borderRadius: BorderRadius.circular(999),
-    ),
-    child: Text(
-      '${name.toUpperCase()}: ${_formatDuration(duration)}',
-      style: figtree(size: 10.5, weight: W.bold, color: AppColors.inkSoft),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final total = sessions.fold(Duration.zero, (sum, s) => sum + s.duration);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  name.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: figtree(
+                    size: 12.5,
+                    weight: W.extrabold,
+                    tracking: Tracking.tight,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _formatDuration(total),
+                style: figtree(
+                  size: 12.5,
+                  weight: W.extrabold,
+                  color: AppColors.brand600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (final session in sessions)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.schedule_rounded,
+                    size: 13,
+                    color: AppColors.inkFaint,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    _formatTime(session.occurredAt),
+                    style: figtree(
+                      size: 12,
+                      weight: W.semibold,
+                      color: AppColors.inkSoft,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    _formatDuration(session.duration),
+                    style: figtree(size: 12, weight: W.bold),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

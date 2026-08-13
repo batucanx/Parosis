@@ -113,7 +113,8 @@ final class WellRequestsController extends ChangeNotifier {
       case Ok<WellRequest>(:final value):
         updated = value;
         _requests = [
-          for (final r in _requests) if (r.id == id) value else r,
+          for (final r in _requests)
+            if (r.id == id) value else r,
         ];
       case Error<WellRequest>(:final error):
         _error = error;

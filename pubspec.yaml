@@ -42,6 +42,11 @@ dependencies:
   flutter_svg: ^2.3.0
   shared_preferences: ^2.3.0
   permission_handler: ^11.3.1
+  geolocator: ^13.0.1
+  firebase_core: ^4.13.0
+  firebase_auth: ^6.5.7
+  cloud_firestore: ^6.8.0
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:
@@ -69,6 +74,7 @@ flutter:
     - assets/icons/logo.svg
     - assets/icons/parosis_mark.svg
     - assets/icons/well_icon.png
+    - assets/icons/google_logo.svg
 
   fonts:
     - family: Figtree

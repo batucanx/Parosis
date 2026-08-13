@@ -42,9 +42,7 @@ final class AuthController extends ChangeNotifier {
   }
 
   Future<bool> login({required String email, required String password}) =>
-      _submit(
-        () => _repository.login(email: email, password: password),
-      );
+      _submit(() => _repository.login(email: email, password: password));
 
   Future<bool> register({
     required String fullName,
@@ -61,6 +59,9 @@ final class AuthController extends ChangeNotifier {
       password: password,
     ),
   );
+
+  Future<bool> loginWithGoogle() =>
+      _submit(() => _repository.loginWithGoogle());
 
   Future<bool> _submit(Future<Result<AuthUser>> Function() action) async {
     if (_isSubmitting) return false;
@@ -90,6 +91,31 @@ final class AuthController extends ChangeNotifier {
 
     var success = false;
     switch (await _repository.sendPasswordResetLink(email: email)) {
+      case Ok<bool>():
+        success = true;
+      case Error<bool>(:final error):
+        _error = _readableMessage(error);
+    }
+
+    _isSubmitting = false;
+    notifyListeners();
+    return success;
+  }
+
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    if (_isSubmitting) return false;
+    _isSubmitting = true;
+    _error = null;
+    notifyListeners();
+
+    var success = false;
+    switch (await _repository.changePassword(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    )) {
       case Ok<bool>():
         success = true;
       case Error<bool>(:final error):

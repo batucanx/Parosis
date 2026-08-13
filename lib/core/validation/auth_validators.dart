@@ -19,12 +19,11 @@ String? validateConfirmPassword(String password, String confirm) {
   return null;
 }
 
-String? validateFullName(String value) {
-  final trimmed = value.trim();
-  if (trimmed.isEmpty) return 'Ad soyad gerekli.';
-  if (!trimmed.contains(RegExp(r'\s'))) return 'Ad ve soyadınızı girin.';
-  return null;
-}
+String? validateFirstName(String value) =>
+    value.trim().isEmpty ? 'Ad gerekli.' : null;
+
+String? validateLastName(String value) =>
+    value.trim().isEmpty ? 'Soyad gerekli.' : null;
 
 String? validatePhoneDigits(String digits) {
   if (digits.isEmpty) return 'Telefon numarası gerekli.';

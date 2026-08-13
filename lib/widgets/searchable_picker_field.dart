@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 
-/// Etiketli, tek seçimlik alan — dokunulunca arama kutulu bir liste sheet'i
-/// açar. Ülke/İl/İlçe gibi uzun listeler için (bkz. kuyu talebi formu).
 class SearchablePickerField extends StatelessWidget {
   final String label;
   final String hint;
@@ -66,9 +64,7 @@ class SearchablePickerField extends StatelessWidget {
                     style: figtree(
                       size: 14,
                       weight: value == null ? W.medium : W.semibold,
-                      color: value == null
-                          ? AppColors.inkFaint
-                          : AppColors.ink,
+                      color: value == null ? AppColors.inkFaint : AppColors.ink,
                     ),
                   ),
                 ),

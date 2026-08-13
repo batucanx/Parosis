@@ -84,9 +84,6 @@ String? validateCardExpiry(String? value) {
   return null;
 }
 
-/// Kayıtlı Kartlar — navbar'dan yukarı kayarak açılan tam ekran sayfa.
-/// Yeni kart formu (canlı önizleme + kart tipi tespiti + kart adlandırma)
-/// ve kayıtlı kart listesi (adıyla birlikte, düzenle/sil).
 class CardsModal extends StatefulWidget {
   final PaymentCardsController controller;
   const CardsModal({super.key, required this.controller});
@@ -509,7 +506,6 @@ class _CardsModalState extends State<CardsModal> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Canlı kart önizlemesi
           Container(
             height: 150,
             width: double.infinity,

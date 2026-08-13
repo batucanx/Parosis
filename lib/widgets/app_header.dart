@@ -8,8 +8,6 @@ import '../theme/text_styles.dart';
 import 'confirm_dialog.dart';
 import 'pressable_scale.dart';
 
-/// Üst çubuk: ana ekranlarda hamburger, alt ekranlarda geri; ortada logo,
-/// sağda bakiye.
 class AppHeader extends StatelessWidget {
   final int balance;
   final VoidCallback onBalanceTap;
@@ -114,12 +112,20 @@ class AppHeader extends StatelessWidget {
   }
 }
 
-const _requestsItem = (
+const _wellsItem = (
   icon: 'wellImage',
-  label: 'Kuyularım ve Taleplerim',
-  desc: 'Kuyu kayıt ve randevu talepleriniz',
+  label: 'Kuyularım',
+  desc: 'Kuyu kayıt talepleriniz',
   color: AppColors.brand700,
   bg: AppColors.brand100,
+);
+
+const _myRequestsItem = (
+  icon: 'calendarClock',
+  label: 'Taleplerim',
+  desc: 'Randevu talepleriniz ve kuyunuza gelen talepler',
+  color: AppColors.sea700,
+  bg: AppColors.sea100,
 );
 
 const _historyItem = (
@@ -136,6 +142,8 @@ Widget _menuIcon(String key, {required double size, required Color color}) {
       return AppIcons.droplets(size: size, color: color);
     case 'listChecks':
       return AppIcons.listChecks(size: size, color: color);
+    case 'calendarClock':
+      return AppIcons.calendarClock(size: size, color: color);
     case 'logout':
       return AppIcons.logout(size: size, color: color);
     default:
@@ -151,16 +159,17 @@ const _logoutItem = (
   bg: AppColors.red50,
 );
 
-/// Tam ekran hızlı erişim menüsü — AppRoot'un kök Stack'inde overlay olarak render edilir.
 class AppDrawerOverlay extends StatelessWidget {
   final VoidCallback onClose;
-  final VoidCallback onOpenRequests;
+  final VoidCallback onOpenWellRequests;
+  final VoidCallback onOpenBookingRequests;
   final VoidCallback onOpenHistory;
   final VoidCallback onLogout;
   const AppDrawerOverlay({
     super.key,
     required this.onClose,
-    required this.onOpenRequests,
+    required this.onOpenWellRequests,
+    required this.onOpenBookingRequests,
     required this.onOpenHistory,
     required this.onLogout,
   });
@@ -180,9 +189,6 @@ class AppDrawerOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: AppColors.sheetBg,
-      // Arkaplan tüm ekranı (ev tuşu çizgisinin altı dahil) kesintisiz
-      // kaplasın, sadece alt kısımdaki versiyon yazısı ev tuşu çizgisinin
-      // üstünde kalsın diye güvenli alan içerikte uygulanıyor.
       child: SafeArea(
         top: false,
         child: Column(
@@ -216,9 +222,14 @@ class AppDrawerOverlay extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 children: [
                   _MenuRow(
-                    item: _requestsItem,
+                    item: _wellsItem,
                     isLast: false,
-                    onTap: onOpenRequests,
+                    onTap: onOpenWellRequests,
+                  ),
+                  _MenuRow(
+                    item: _myRequestsItem,
+                    isLast: false,
+                    onTap: onOpenBookingRequests,
                   ),
                   _MenuRow(
                     item: _historyItem,
@@ -248,10 +259,7 @@ class AppDrawerOverlay extends StatelessWidget {
                   top: BorderSide(color: Colors.black.withValues(alpha: 0.06)),
                 ),
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 16,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               width: double.infinity,
               child: Text(
                 'Sulama Yönetim Sistemi v1.0',

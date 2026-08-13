@@ -131,7 +131,7 @@ final class MockAuthRepository implements AuthRepository {
     final accounts = await _loadAccounts();
     final account = _findByEmail(accounts, email);
     if (account == null || account.password != password) {
-      return Result.error(Exception('E-posta veya şifre hatalı.'));
+      return Result.error(Exception('E-posta ya da şifre yanlış.'));
     }
     await _setActiveAccountId(account.id);
     return Result.ok(account.toAuthUser());
@@ -167,6 +167,28 @@ final class MockAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<Result<AuthUser>> loginWithGoogle() async {
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    final accounts = await _loadAccounts();
+    var account = _findByEmail(accounts, 'google.demo@parosis.com');
+    if (account == null) {
+      account = _Account(
+        id: 'SLM-${10000 + _nextSeq}',
+        fullName: 'Google Kullanıcısı',
+        email: 'google.demo@parosis.com',
+        tcKimlik: '',
+        phone: '',
+        password: '',
+      );
+      _nextSeq += 1;
+      accounts.add(account);
+      await _persistAccounts();
+    }
+    await _setActiveAccountId(account.id);
+    return Result.ok(account.toAuthUser());
+  }
+
+  @override
   Future<Result<bool>> sendPasswordResetLink({required String email}) async {
     await Future<void>.delayed(const Duration(milliseconds: 500));
     final accounts = await _loadAccounts();
@@ -175,6 +197,39 @@ final class MockAuthRepository implements AuthRepository {
         Exception('Bu e-posta ile kayıtlı bir hesap bulunamadı.'),
       );
     }
+    return const Result.ok(true);
+  }
+
+  @override
+  Future<Result<bool>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    final prefs = await SharedPreferences.getInstance();
+    final activeId = prefs.getString(_activeAccountIdKey);
+    if (activeId == null) {
+      return Result.error(Exception('Oturum açılmamış.'));
+    }
+
+    final accounts = await _loadAccounts();
+    final index = accounts.indexWhere((a) => a.id == activeId);
+    if (index == -1) {
+      return Result.error(Exception('Oturum açılmamış.'));
+    }
+    if (accounts[index].password != currentPassword) {
+      return Result.error(Exception('Mevcut şifreniz yanlış.'));
+    }
+
+    _cache![index] = _Account(
+      id: accounts[index].id,
+      fullName: accounts[index].fullName,
+      email: accounts[index].email,
+      tcKimlik: accounts[index].tcKimlik,
+      phone: accounts[index].phone,
+      password: newPassword,
+    );
+    await _persistAccounts();
     return const Result.ok(true);
   }
 

@@ -60,7 +60,8 @@ final class WellBookingsController extends ChangeNotifier {
       case Ok<WellBookingRequest>(:final value):
         success = true;
         _requests = [
-          for (final r in _requests) if (r.id == id) value else r,
+          for (final r in _requests)
+            if (r.id == id) value else r,
         ];
       case Error<WellBookingRequest>(:final error):
         _error = error;
@@ -82,7 +83,8 @@ final class WellBookingsController extends ChangeNotifier {
       case Ok<WellBookingRequest>(:final value):
         success = true;
         _requests = [
-          for (final r in _requests) if (r.id == id) value else r,
+          for (final r in _requests)
+            if (r.id == id) value else r,
         ];
       case Error<WellBookingRequest>(:final error):
         _error = error;

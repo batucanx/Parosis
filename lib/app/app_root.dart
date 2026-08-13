@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'package:parosis_sulama/features/home/presentation/screens/home_screen.dart';
 import 'package:parosis_sulama/features/irrigation/presentation/screens/past_irrigations_screen.dart';
+import 'package:parosis_sulama/features/profile/presentation/screens/address_info_screen.dart';
 import 'package:parosis_sulama/features/profile/presentation/screens/profile_screen.dart';
 import 'package:parosis_sulama/features/wallet/presentation/screens/balance_screens.dart';
-import 'package:parosis_sulama/features/well_requests/presentation/screens/requests_screen.dart';
+import 'package:parosis_sulama/features/well_bookings/presentation/screens/booking_requests_screen.dart';
+import 'package:parosis_sulama/features/well_requests/presentation/screens/well_requests_screen.dart';
 import 'package:parosis_sulama/features/wells/presentation/screens/well_screens.dart';
 import 'package:parosis_sulama/theme/colors.dart';
 import 'package:parosis_sulama/widgets/app_header.dart';
@@ -16,7 +18,11 @@ import 'navigation/app_destination.dart';
 
 /// Web prototipindeki tek ekran state machine'inin Flutter karşılığı.
 class AppRoot extends StatefulWidget {
-  const AppRoot({super.key, required this.dependencies, required this.onLogout});
+  const AppRoot({
+    super.key,
+    required this.dependencies,
+    required this.onLogout,
+  });
 
   final AppDependencies dependencies;
   final VoidCallback onLogout;
@@ -31,6 +37,7 @@ class _AppRootState extends State<AppRoot> {
   String? _selectedWellId;
   AppDestination _wellEditBackTarget = AppDestination.home;
   String? _selectedHistoryWellId;
+  AppDestination _addressInfoBackTarget = AppDestination.profile;
   bool _menuOpen = false;
 
   void _go(AppDestination next) => setState(() {
@@ -44,6 +51,11 @@ class _AppRootState extends State<AppRoot> {
       _wellEditBackTarget = _screen;
     });
     _go(AppDestination.wellEdit);
+  }
+
+  void _openAddressInfo() {
+    setState(() => _addressInfoBackTarget = _screen);
+    _go(AppDestination.addressInfo);
   }
 
   void _openPastIrrigationDetail(String wellId) {
@@ -67,11 +79,13 @@ class _AppRootState extends State<AppRoot> {
   AppDestination get _backTarget => switch (_screen) {
     AppDestination.program ||
     AppDestination.instant ||
-    AppDestination.requests ||
+    AppDestination.wellRequests ||
+    AppDestination.bookingRequests ||
     AppDestination.pastIrrigations => AppDestination.home,
     AppDestination.wellEdit => _wellEditBackTarget,
     AppDestination.pastIrrigationDetail => AppDestination.pastIrrigations,
     AppDestination.topUp => AppDestination.balance,
+    AppDestination.addressInfo => _addressInfoBackTarget,
     AppDestination.home ||
     AppDestination.balance ||
     AppDestination.profile => _screen,
@@ -101,7 +115,9 @@ class _AppRootState extends State<AppRoot> {
       AppDestination.instant => InstantScreen(
         wellsController: deps.wellsController,
         irrigationController: deps.irrigationController,
+        profileController: deps.profileController,
         onNavigateHome: () => _go(AppDestination.home),
+        onAddressRequired: _openAddressInfo,
       ),
       AppDestination.balance => BalanceScreen(
         walletController: deps.walletController,
@@ -112,6 +128,12 @@ class _AppRootState extends State<AppRoot> {
       AppDestination.profile => ProfileScreen(
         profileController: deps.profileController,
         paymentCardsController: deps.paymentCardsController,
+        irrigationController: deps.irrigationController,
+        wellBookingsController: deps.wellBookingsController,
+        authController: deps.authController,
+        notificationPreferencesController: deps.notificationPreferencesController,
+        onOpenAddressInfo: _openAddressInfo,
+        onLogout: widget.onLogout,
       ),
       AppDestination.wellEdit => WellEditScreen(
         wellsController: deps.wellsController,
@@ -119,9 +141,11 @@ class _AppRootState extends State<AppRoot> {
         wellId: _selectedWellId,
         onSubmitted: () => _go(_wellEditBackTarget),
       ),
-      AppDestination.requests => RequestsScreen(
-        wellRequestsController: deps.wellRequestsController,
-        wellBookingsController: deps.wellBookingsController,
+      AppDestination.wellRequests => WellRequestsScreen(
+        controller: deps.wellRequestsController,
+      ),
+      AppDestination.bookingRequests => BookingRequestsScreen(
+        controller: deps.wellBookingsController,
       ),
       AppDestination.pastIrrigations => PastIrrigationsScreen(
         wellsController: deps.wellsController,
@@ -132,6 +156,10 @@ class _AppRootState extends State<AppRoot> {
         wellsController: deps.wellsController,
         irrigationController: deps.irrigationController,
         wellId: _selectedHistoryWellId,
+      ),
+      AppDestination.addressInfo => AddressInfoScreen(
+        controller: deps.profileController,
+        onSaved: () => _go(_addressInfoBackTarget),
       ),
     };
   }
@@ -216,9 +244,13 @@ class _AppRootState extends State<AppRoot> {
                     ? AppDrawerOverlay(
                         key: const ValueKey('quick-access-drawer'),
                         onClose: () => setState(() => _menuOpen = false),
-                        onOpenRequests: () {
+                        onOpenWellRequests: () {
                           setState(() => _menuOpen = false);
-                          _go(AppDestination.requests);
+                          _go(AppDestination.wellRequests);
+                        },
+                        onOpenBookingRequests: () {
+                          setState(() => _menuOpen = false);
+                          _go(AppDestination.bookingRequests);
                         },
                         onOpenHistory: () {
                           setState(() => _menuOpen = false);

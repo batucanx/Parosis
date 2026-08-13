@@ -6,11 +6,6 @@ enum WellBookingStatus { pending, approved, rejected, cancelled }
 /// yöne göre "Kuyularıma Gelen Talepler" (incoming — başkasının kuyumu
 /// kullanma talebi, benim onaylamam gerekir) veya "Taleplerim" (outgoing —
 /// benim başka bir kuyu için gönderdiğim talep) listesinde gösterilir.
-///
-/// Bu, Program Sulama ekranındaki "Sıra Al" akışının basitleştirilmiş bir
-/// modeli — kuyu sahipliği/kuyruk sistemi henüz kurulmadığı için talepler
-/// burada sadece listelenip yanıtlanabiliyor, yeni talep oluşturma akışı
-/// (Sıra Al) ayrı bir işte ele alınacak.
 class WellBookingRequest {
   final String id;
   final String wellId;

@@ -1,11 +1,11 @@
+enum WellScheduleEntryKind { mine, occupied, pendingApproval }
+
 /// A single block on a well's day-occupancy timeline (Program Sulama →
 /// kuyu düzenleme ekranındaki "Günün doluluğu" şeridi).
 ///
 /// [mine] = oturumdaki kullanıcının kendi (bekleyen ya da onaylı) talebi,
 /// [occupied] = başka birinin onaylı/aktif kullanımı, [pendingApproval] =
 /// başka birinin henüz onaylanmamış talebi.
-enum WellScheduleEntryKind { mine, occupied, pendingApproval }
-
 class WellScheduleEntry {
   final String id;
   final DateTime start;

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:parosis_sulama/core/forms/scroll_to_field.dart';
 import 'package:parosis_sulama/core/permissions/onboarding_permissions.dart';
 import 'package:parosis_sulama/core/validation/auth_validators.dart';
 import 'package:parosis_sulama/features/auth/presentation/controllers/auth_controller.dart';
@@ -30,20 +31,32 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final _fullNameCtrl = TextEditingController();
+  final _firstNameCtrl = TextEditingController();
+  final _lastNameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _tcKimlikCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
 
+  final _firstNameFocus = FocusNode();
+  final _lastNameFocus = FocusNode();
   final _emailFocus = FocusNode();
   final _tcKimlikFocus = FocusNode();
   final _phoneFocus = FocusNode();
   final _passwordFocus = FocusNode();
   final _confirmPasswordFocus = FocusNode();
 
-  String? _fullNameError;
+  final _firstNameKey = GlobalKey();
+  final _lastNameKey = GlobalKey();
+  final _emailKey = GlobalKey();
+  final _tcKimlikKey = GlobalKey();
+  final _phoneKey = GlobalKey();
+  final _passwordKey = GlobalKey();
+  final _confirmPasswordKey = GlobalKey();
+
+  String? _firstNameError;
+  String? _lastNameError;
   String? _emailError;
   String? _tcKimlikError;
   String? _phoneError;
@@ -52,12 +65,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
-    _fullNameCtrl.dispose();
+    _firstNameCtrl.dispose();
+    _lastNameCtrl.dispose();
     _emailCtrl.dispose();
     _tcKimlikCtrl.dispose();
     _phoneCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
+    _firstNameFocus.dispose();
+    _lastNameFocus.dispose();
     _emailFocus.dispose();
     _tcKimlikFocus.dispose();
     _phoneFocus.dispose();
@@ -68,7 +84,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _submit() async {
     final phoneDigits = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
-    final fullNameError = validateFullName(_fullNameCtrl.text);
+    final firstNameError = validateFirstName(_firstNameCtrl.text);
+    final lastNameError = validateLastName(_lastNameCtrl.text);
     final emailError = validateEmail(_emailCtrl.text);
     final tcKimlikError = validateTcKimlik(_tcKimlikCtrl.text);
     final phoneError = validatePhoneDigits(phoneDigits);
@@ -79,7 +96,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
 
     setState(() {
-      _fullNameError = fullNameError;
+      _firstNameError = firstNameError;
+      _lastNameError = lastNameError;
       _emailError = emailError;
       _tcKimlikError = tcKimlikError;
       _phoneError = phoneError;
@@ -87,19 +105,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _confirmPasswordError = confirmPasswordError;
     });
 
-    if ([
-      fullNameError,
+    final hasError = [
+      firstNameError,
+      lastNameError,
       emailError,
       tcKimlikError,
       phoneError,
       passwordError,
       confirmPasswordError,
-    ].any((e) => e != null)) {
+    ].any((e) => e != null);
+
+    if (hasError) {
+      await scrollToFirstError([
+        (firstNameError, _firstNameKey, _firstNameFocus),
+        (lastNameError, _lastNameKey, _lastNameFocus),
+        (emailError, _emailKey, _emailFocus),
+        (tcKimlikError, _tcKimlikKey, _tcKimlikFocus),
+        (phoneError, _phoneKey, _phoneFocus),
+        (passwordError, _passwordKey, _passwordFocus),
+        (confirmPasswordError, _confirmPasswordKey, _confirmPasswordFocus),
+      ]);
       return;
     }
 
+    final fullName =
+        '${_firstNameCtrl.text.trim()} ${_lastNameCtrl.text.trim()}'.trim();
     final success = await widget.controller.register(
-      fullName: _fullNameCtrl.text.trim(),
+      fullName: fullName,
       email: _emailCtrl.text.trim(),
       tcKimlik: _tcKimlikCtrl.text,
       phone: phoneDigits,
@@ -116,6 +148,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     builder: (context, _) {
       final controller = widget.controller;
       return AuthScaffold(
+        onBack: widget.onBackToLogin,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -128,28 +161,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 tracking: Tracking.tight,
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Bilgilerinizi girin, kuyularınızı yönetmeye başlayın',
-              textAlign: TextAlign.center,
-              style: figtree(
-                size: 12.5,
-                weight: W.medium,
-                color: AppColors.inkSoft,
-              ),
-            ),
             const SizedBox(height: 22),
             AuthTextField(
-              controller: _fullNameCtrl,
-              label: 'Ad Soyad',
-              hint: 'Adınız Soyadınız',
+              key: _firstNameKey,
+              controller: _firstNameCtrl,
+              focusNode: _firstNameFocus,
+              label: 'Ad',
+              hint: 'Adınız',
               iconBuilder: (c) => AppIcons.user(size: 19, color: c),
-              errorText: _fullNameError,
-              onSubmitted: (_) => FocusScope.of(context).requestFocus(_emailFocus),
-              autofillHints: const [AutofillHints.name],
+              errorText: _firstNameError,
+              onSubmitted: (_) =>
+                  FocusScope.of(context).requestFocus(_lastNameFocus),
+              autofillHints: const [AutofillHints.givenName],
             ),
             const SizedBox(height: 14),
             AuthTextField(
+              key: _lastNameKey,
+              controller: _lastNameCtrl,
+              focusNode: _lastNameFocus,
+              label: 'Soyad',
+              hint: 'Soyadınız',
+              iconBuilder: (c) => AppIcons.user(size: 19, color: c),
+              errorText: _lastNameError,
+              onSubmitted: (_) =>
+                  FocusScope.of(context).requestFocus(_emailFocus),
+              autofillHints: const [AutofillHints.familyName],
+            ),
+            const SizedBox(height: 14),
+            AuthTextField(
+              key: _emailKey,
               controller: _emailCtrl,
               focusNode: _emailFocus,
               label: 'E-posta',
@@ -163,6 +203,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 14),
             AuthTextField(
+              key: _tcKimlikKey,
               controller: _tcKimlikCtrl,
               focusNode: _tcKimlikFocus,
               label: 'T.C. Kimlik No',
@@ -179,6 +220,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 14),
             AuthTextField(
+              key: _phoneKey,
               controller: _phoneCtrl,
               focusNode: _phoneFocus,
               label: 'Telefon',
@@ -193,6 +235,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 14),
             AuthTextField(
+              key: _passwordKey,
               controller: _passwordCtrl,
               focusNode: _passwordFocus,
               label: 'Şifre',
@@ -206,6 +249,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 14),
             AuthTextField(
+              key: _confirmPasswordKey,
               controller: _confirmPasswordCtrl,
               focusNode: _confirmPasswordFocus,
               label: 'Şifre Tekrar',

@@ -4,7 +4,6 @@ import 'package:parosis_sulama/theme/colors.dart';
 import 'package:parosis_sulama/theme/text_styles.dart';
 import 'package:parosis_sulama/widgets/pressable_scale.dart';
 
-/// Ana eylem butonu — "Giriş Yap" / "Hesap Oluştur" / "Bağlantı Gönder".
 class AuthPrimaryButton extends StatelessWidget {
   const AuthPrimaryButton({
     super.key,
@@ -82,8 +81,6 @@ class AuthPrimaryButton extends StatelessWidget {
   }
 }
 
-/// Uygulamanın "pasif / kapalı" nötr grisiyle dolu ikincil eylem —
-/// login ekranındaki "Kayıt Ol" butonu için.
 class AuthTonalButton extends StatelessWidget {
   const AuthTonalButton({super.key, required this.label, required this.onTap});
 
@@ -98,20 +95,24 @@ class AuthTonalButton extends StatelessWidget {
       height: 52,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.mist600,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.brand700, width: 1.5),
       ),
       child: Center(
         child: Text(
           label,
-          style: figtree(size: 14.5, weight: W.extrabold, color: Colors.white),
+          style: figtree(
+            size: 14.5,
+            weight: W.extrabold,
+            color: AppColors.brand700,
+          ),
         ),
       ),
     ),
   );
 }
 
-/// Beyaz zeminli, ince kenarlıklı buton — "Google ile giriş yap".
 class AuthOutlineButton extends StatelessWidget {
   const AuthOutlineButton({
     super.key,
@@ -129,12 +130,20 @@ class AuthOutlineButton extends StatelessWidget {
     scale: 0.98,
     onTap: onTap,
     child: Container(
-      height: 52,
+      height: 54,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.surfaceSoft,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.surfaceBorder, width: 1.3),
+        border: Border.all(color: const Color(0xFF4285F4), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 12,
+            spreadRadius: -6,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -150,7 +159,6 @@ class AuthOutlineButton extends StatelessWidget {
   );
 }
 
-/// "veya" ayracı.
 class AuthOrDivider extends StatelessWidget {
   const AuthOrDivider({super.key});
 
@@ -162,7 +170,11 @@ class AuthOrDivider extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Text(
           'veya',
-          style: figtree(size: 12, weight: W.semibold, color: AppColors.inkFaint),
+          style: figtree(
+            size: 12,
+            weight: W.semibold,
+            color: AppColors.inkFaint,
+          ),
         ),
       ),
       Expanded(child: Divider(color: AppColors.surfaceBorder, thickness: 1)),

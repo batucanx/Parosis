@@ -32,6 +32,20 @@
 	<string>Kuyu ve saha fotoğrafı çekebilmeniz için kameraya erişim gereklidir.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- Google Sign-In: iOS geri dönüş URL şeması (REVERSED_CLIENT_ID,
+	     firebase_options.dart -> ios.iosClientId'den türetildi). Bu olmadan
+	     "Google ile giriş yap" akışı tarayıcıdan uygulamaya dönemez. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.136497821478-p5nsthe5hjspjvc5cg3r56b9rok7cm56</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

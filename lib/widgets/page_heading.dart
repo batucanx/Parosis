@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../theme/text_styles.dart';
 
-/// Alt sayfa başlığı. Geri navigasyonu ortak AppHeader tarafından yönetilir.
 class PageHeading extends StatelessWidget {
   final String title;
   final String? subtitle;

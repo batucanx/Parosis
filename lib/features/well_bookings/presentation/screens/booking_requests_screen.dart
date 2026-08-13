@@ -6,12 +6,14 @@ import 'package:parosis_sulama/theme/colors.dart';
 import 'package:parosis_sulama/theme/text_styles.dart';
 import 'package:parosis_sulama/widgets/confirm_dialog.dart';
 import 'package:parosis_sulama/widgets/glass.dart';
+import 'package:parosis_sulama/widgets/page_heading.dart';
 import 'package:parosis_sulama/widgets/pressable_scale.dart';
 
 String _twoDigits(int n) => n.toString().padLeft(2, '0');
 String _formatDate(DateTime dt) =>
     '${_twoDigits(dt.day)}.${_twoDigits(dt.month)}.${dt.year}';
-String _formatTime(DateTime dt) => '${_twoDigits(dt.hour)}:${_twoDigits(dt.minute)}';
+String _formatTime(DateTime dt) =>
+    '${_twoDigits(dt.hour)}:${_twoDigits(dt.minute)}';
 
 String _statusLabel(WellBookingStatus status) => switch (status) {
   WellBookingStatus.pending => 'Onay Bekliyor',
@@ -34,17 +36,18 @@ Color _statusBg(WellBookingStatus status) => switch (status) {
   WellBookingStatus.cancelled => AppColors.slate100,
 };
 
-/// "Talepler" ekranının "Randevu Talepleri" sekmesi — bana gelen (onayım
-/// gereken) ve benim gönderdiğim randevu taleplerinin durum filtreli listesi.
-class WellBookingsTab extends StatefulWidget {
+enum _BookingsTab { mine, incoming }
+
+class BookingRequestsScreen extends StatefulWidget {
   final WellBookingsController controller;
-  const WellBookingsTab({super.key, required this.controller});
+  const BookingRequestsScreen({super.key, required this.controller});
 
   @override
-  State<WellBookingsTab> createState() => _WellBookingsTabState();
+  State<BookingRequestsScreen> createState() => _BookingRequestsScreenState();
 }
 
-class _WellBookingsTabState extends State<WellBookingsTab> {
+class _BookingRequestsScreenState extends State<BookingRequestsScreen> {
+  _BookingsTab _tab = _BookingsTab.mine;
   WellBookingStatus? _filter;
 
   List<WellBookingRequest> _applyFilter(List<WellBookingRequest> items) {
@@ -54,58 +57,153 @@ class _WellBookingsTabState extends State<WellBookingsTab> {
   }
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: widget.controller,
-    builder: (context, _) {
-      if (widget.controller.isLoading) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24),
-          child: Center(
-            child: Text(
-              'Randevu talepleri yükleniyor…',
-              style: figtree(
-                size: 13,
-                weight: W.semibold,
-                color: AppColors.inkFaint,
+  Widget build(BuildContext context) => ListView(
+    padding: const EdgeInsets.fromLTRB(20, 2, 20, 104),
+    children: [
+      const PageHeading(
+        title: 'Taleplerim',
+        subtitle: 'Randevu taleplerinizi yönetin',
+      ),
+      const SizedBox(height: 18),
+      _BookingsTabBar(
+        value: _tab,
+        onChanged: (tab) => setState(() => _tab = tab),
+      ),
+      const SizedBox(height: 18),
+      ListenableBuilder(
+        listenable: widget.controller,
+        builder: (context, _) {
+          if (widget.controller.isLoading) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  'Randevu talepleri yükleniyor…',
+                  style: figtree(
+                    size: 13,
+                    weight: W.semibold,
+                    color: AppColors.inkFaint,
+                  ),
+                ),
               ),
-            ),
-          ),
-        );
-      }
+            );
+          }
 
-      final incoming = _applyFilter(widget.controller.incoming);
-      final outgoing = _applyFilter(widget.controller.outgoing);
+          final items = _applyFilter(
+            _tab == _BookingsTab.mine
+                ? widget.controller.outgoing
+                : widget.controller.incoming,
+          );
+          final emptyText = _tab == _BookingsTab.mine
+              ? 'Henüz talep göndermediniz.'
+              : 'Henüz talep yok.';
 
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _StatusFilterRow(
-            value: _filter,
-            onChanged: (v) => setState(() => _filter = v),
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _StatusFilterRow(
+                value: _filter,
+                onChanged: (v) => setState(() => _filter = v),
+              ),
+              const SizedBox(height: 16),
+              if (items.isEmpty)
+                _EmptyNotice(text: emptyText)
+              else
+                for (final r in items) ...[
+                  _BookingCard(request: r, controller: widget.controller),
+                  const SizedBox(height: 10),
+                ],
+            ],
+          );
+        },
+      ),
+    ],
+  );
+}
+
+class _BookingsTabBar extends StatelessWidget {
+  final _BookingsTab value;
+  final ValueChanged<_BookingsTab> onChanged;
+  const _BookingsTabBar({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(4),
+    decoration: BoxDecoration(
+      color: AppColors.surfaceSoft,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: AppColors.surfaceBorder),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: _TabButton(
+            label: 'Taleplerim',
+            selected: value == _BookingsTab.mine,
+            onTap: () => onChanged(_BookingsTab.mine),
+            selectedColor: AppColors.brand700,
+            selectedTextColor: Colors.white,
           ),
-          const SizedBox(height: 16),
-          _SectionLabel('Kuyularıma Gelen Talepler (${incoming.length})'),
-          const SizedBox(height: 10),
-          if (incoming.isEmpty)
-            const _EmptyNotice(text: 'Henüz talep yok.')
-          else
-            for (final r in incoming) ...[
-              _BookingCard(request: r, controller: widget.controller),
-              const SizedBox(height: 10),
-            ],
-          const SizedBox(height: 18),
-          _SectionLabel('Taleplerim (${outgoing.length})'),
-          const SizedBox(height: 10),
-          if (outgoing.isEmpty)
-            const _EmptyNotice(text: 'Henüz talep göndermediniz.')
-          else
-            for (final r in outgoing) ...[
-              _BookingCard(request: r, controller: widget.controller),
-              const SizedBox(height: 10),
-            ],
-        ],
-      );
-    },
+        ),
+        Expanded(
+          child: _TabButton(
+            label: 'Kuyuma Gelen Talepler',
+            selected: value == _BookingsTab.incoming,
+            onTap: () => onChanged(_BookingsTab.incoming),
+            selectedColor: AppColors.brand700,
+            selectedTextColor: Colors.white,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _TabButton extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color selectedColor;
+  final Color selectedTextColor;
+  const _TabButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.selectedColor = Colors.white,
+    this.selectedTextColor = AppColors.ink,
+  });
+
+  @override
+  Widget build(BuildContext context) => PressableScale(
+    scale: 0.97,
+    onTap: onTap,
+    child: Container(
+      height: 40,
+      decoration: BoxDecoration(
+        color: selected ? selectedColor : Colors.transparent,
+        borderRadius: BorderRadius.circular(11),
+        boxShadow: selected
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
+      ),
+      child: Center(
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: figtree(
+            size: 12.5,
+            weight: W.extrabold,
+            color: selected ? selectedTextColor : AppColors.inkSoft,
+          ),
+        ),
+      ),
+    ),
   );
 }
 
@@ -172,16 +270,6 @@ class _FilterChip extends StatelessWidget {
         ),
       ),
     ),
-  );
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
-  @override
-  Widget build(BuildContext context) => Text(
-    text,
-    style: figtree(size: 13.5, weight: W.extrabold, color: AppColors.ink),
   );
 }
 
